@@ -29,6 +29,8 @@ function chart(
 }
 
 const eur = (n: number) => `€${Number(n).toFixed(2)}`;
+/** Big amounts (home loans) without cents: 285500 → "€285,500". */
+const eur0 = (n: number) => `€${Math.round(n).toLocaleString("en")}`;
 const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
 
 export function mockReply(history: ChatMessage[]): ChatMessage {
@@ -42,6 +44,23 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   const category = [...listCategories(), ...allMerchantTypes()].find((c) =>
     q.includes(c.toLowerCase()),
   );
+
+  // WHY first: "home loan" would otherwise match the "Home & Tech" category or another keyword.
+  if (has(q, "mortgage", "home loan", "loan", "laina")) {
+    const m = data("mortgage_status");
+    if (!m.hasMortgage) {
+      return reply("You don't have a home loan application. Want to see how much you could save each month?");
+    }
+    const reason = String(m.rejectionReason ?? "not recorded").replace(/_/g, " ");
+    return reply(
+      m.decision === "approved"
+        ? `Your home loan of ${eur0(m.loanEur)} was approved on ${m.decidedOn}. ` +
+            `You're paying ${eur0(m.equityEur)} of the ${eur0(m.property.priceEur)} price with your own money.`
+        : `Your home loan application was rejected on ${m.decidedOn}. The bank's reason: ${reason}. ` +
+            `You applied for ${eur0(m.loanEur)} with ${eur0(m.equityEur)} of your own money.`,
+      chart("pie", "How the home is paid for", "mortgage_financing"),
+    );
+  }
 
   if (has(q, "this month", "so far", "on track", "projection", "cumulative", "month progress")) {
     const m = data("month_progress");
@@ -212,6 +231,6 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
       '"where does my money slip away", "how much could I save if I cut restaurants by 20%", ' +
       '"what\'s safe to spend", "my bills", "surprise costs", "compared to people my age", ' +
       '"my income", "my balance", "biggest purchases", "compare months", "my baskets", ' +
-      '"spending trend", "spending calendar", or a category like "taxi".',
+      '"spending trend", "spending calendar", "my home loan", or a category like "taxi".',
   );
 }

@@ -44,6 +44,11 @@ RULES:
    Combine building-block tools for anything else. The user may ask for any time range:
    use exact from/to dates (YYYY-MM-DD) when they name dates or months.
 8. The data covers ${ctx.firstDay} to ${ctx.today}. Say so if asked about other dates.
+9. HOME LOAN: for questions about a mortgage / home loan / "asuntolaina", call mortgage_status.
+   Explain the bank's decision and rejection reason as recorded — never guess other reasons.
+   The data has no interest rate or monthly loan payment, so don't estimate one.
+   For a rejection, connect it to things the user can act on (e.g. saving more for own money),
+   using the spending tools to show where money could be saved.
 
 The user's spending categories are: ${ctx.categories.join(", ")}.
 The "category" argument of tools also matches these merchant types: ${ctx.merchantTypes.join(", ")}.`;

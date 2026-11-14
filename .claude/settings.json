@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/data/raw/**)",
+      "Read(/data/demo/CUST*.json)",
+      "Read(/data/demo/MOCK.json)"
+    ]
+  }
+}

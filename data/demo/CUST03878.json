@@ -4,6 +4,241 @@
   "postalCode": "00800",
   "age": 48
  },
+ "mortgage": {
+  "mortgageId": "C0025",
+  "decision": "approved",
+  "rejectionReason": null,
+  "propertyPriceEur": 349500,
+  "loanEur": 285500,
+  "equityEur": 64000,
+  "collateralValueEur": 269000,
+  "requiredMonthlyIncomeEur": 5255.66,
+  "loanToValue": 0.8169,
+  "events": [
+   {
+    "date": "2026-03-15",
+    "time": "00:00:00",
+    "type": "application_created",
+    "note": "The customer started a mortgage application."
+   },
+   {
+    "date": "2026-03-17",
+    "time": "17:33:20",
+    "type": "customer_contact",
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-03-20",
+    "time": "02:42:46",
+    "type": "property_added",
+    "propertyId": "P0025_01",
+    "propertyType": "apartment",
+    "propertyPriceEur": 368000,
+    "note": "The customer added a property to the mortgage application and reviewed how it fits the financing plan. The estimated property price is EUR 368,000."
+   },
+   {
+    "date": "2026-03-21",
+    "time": "20:28:13",
+    "type": "property_price_updated",
+    "propertyId": "P0025_01",
+    "propertyType": "apartment",
+    "propertyPriceEur": 351500,
+    "note": "The property price estimate was updated and the financing need was reassessed. The updated property price estimate is EUR 351,500."
+   },
+   {
+    "date": "2026-03-23",
+    "time": "19:21:43",
+    "type": "customer_contact",
+    "propertyId": "P0025_01",
+    "propertyPriceEur": 351500,
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-03-27",
+    "time": "05:22:37",
+    "type": "customer_contact",
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-03-27",
+    "time": "20:24:39",
+    "type": "property_added",
+    "propertyId": "P0025_02",
+    "propertyType": "detached_house",
+    "propertyPriceEur": 460500,
+    "note": "The customer added a property to the mortgage application and reviewed how it fits the financing plan. The estimated property price is EUR 460,500."
+   },
+   {
+    "date": "2026-03-29",
+    "time": "17:10:39",
+    "type": "customer_contact",
+    "propertyId": "P0025_02",
+    "propertyPriceEur": 460500,
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-04-03",
+    "time": "10:14:48",
+    "type": "customer_contact",
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-04-04",
+    "time": "06:30:06",
+    "type": "property_added",
+    "propertyId": "P0025_03",
+    "propertyType": "terraced_house",
+    "propertyPriceEur": 349500,
+    "note": "The customer added a property to the mortgage application and reviewed how it fits the financing plan. The estimated property price is EUR 349,500."
+   },
+   {
+    "date": "2026-04-06",
+    "time": "11:06:13",
+    "type": "customer_contact",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-04-07",
+    "time": "21:40:52",
+    "type": "loan_calculation",
+    "propertyId": "P0025_03",
+    "propertyType": "terraced_house",
+    "propertyPriceEur": 349500,
+    "loanAmountEur": 285500,
+    "equityEur": 64000,
+    "note": "A mortgage calculation was prepared and affordability was reviewed. Requested loan amount: EUR 285,500. Equity amount: EUR 64,000."
+   },
+   {
+    "date": "2026-04-09",
+    "time": "23:42:23",
+    "type": "income_information_received",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "note": "The requested income information was received and reviewed for the mortgage application."
+   },
+   {
+    "date": "2026-04-12",
+    "time": "02:01:36",
+    "type": "expense_recorded",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "expenseType": "renovation",
+    "expenseEur": 12000,
+    "note": "An expense related to the mortgage assessment was recorded: renovation. Amount: EUR 12,000."
+   },
+   {
+    "date": "2026-04-12",
+    "time": "19:21:56",
+    "type": "expense_recorded",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "expenseType": "transfer_tax",
+    "expenseEur": 9500,
+    "note": "An expense related to the mortgage assessment was recorded: transfer tax. Amount: EUR 9,500."
+   },
+   {
+    "date": "2026-04-14",
+    "time": "15:46:02",
+    "type": "expense_recorded",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "expenseType": "existing_loan",
+    "expenseEur": 0,
+    "note": "An expense related to the mortgage assessment was recorded: existing loan. Amount: EUR 0."
+   },
+   {
+    "date": "2026-04-17",
+    "time": "03:33:35",
+    "type": "collateral_added",
+    "propertyId": "P0025_03",
+    "propertyType": "terraced_house",
+    "propertyPriceEur": 349500,
+    "collateralType": "apartment",
+    "collateralStatus": "pending",
+    "note": "Collateral was added to the mortgage application."
+   },
+   {
+    "date": "2026-04-19",
+    "time": "05:11:01",
+    "type": "collateral_valuation",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "collateralType": "apartment",
+    "collateralValueEur": 269000,
+    "collateralStatus": "approved",
+    "note": "The collateral value was assessed for the mortgage application. Collateral value: EUR 269,000."
+   },
+   {
+    "date": "2026-04-20",
+    "time": "20:09:20",
+    "type": "additional_collateral_requested",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "loanAmountEur": 285500,
+    "equityEur": 64000,
+    "collateralType": "other_apartment",
+    "collateralStatus": "pending",
+    "note": "Additional collateral was requested or discussed as part of the mortgage assessment."
+   },
+   {
+    "date": "2026-04-21",
+    "time": "06:00:37",
+    "type": "collateral_valuation",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "collateralType": "other_apartment",
+    "collateralValueEur": 198000,
+    "collateralStatus": "approved",
+    "note": "The collateral value was assessed for the mortgage application. Collateral value: EUR 198,000."
+   },
+   {
+    "date": "2026-04-22",
+    "time": "21:34:35",
+    "type": "document_received",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "note": "A requested document was received and added to the mortgage application."
+   },
+   {
+    "date": "2026-04-24",
+    "time": "12:00:01",
+    "type": "customer_contact",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "loanAmountEur": 285500,
+    "equityEur": 64000,
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   },
+   {
+    "date": "2026-04-27",
+    "time": "06:35:15",
+    "type": "loan_decision",
+    "propertyId": "P0025_03",
+    "propertyType": "terraced_house",
+    "propertyPriceEur": 349500,
+    "loanAmountEur": 285500,
+    "equityEur": 64000,
+    "collateralType": "apartment",
+    "collateralValueEur": 269000,
+    "collateralStatus": "approved",
+    "decision": "approved",
+    "note": "The mortgage application was approved and the positive decision was communicated to the customer."
+   },
+   {
+    "date": "2026-04-27",
+    "time": "14:57:12",
+    "type": "customer_contact",
+    "propertyId": "P0025_03",
+    "propertyPriceEur": 349500,
+    "loanAmountEur": 285500,
+    "equityEur": 64000,
+    "decision": "approved",
+    "note": "The customer contacted the bank to discuss the mortgage, financing needs, affordability, loan terms, or the property under consideration."
+   }
+  ]
+ },
  "transactions": [
   {
    "customerId": "CUST03878",

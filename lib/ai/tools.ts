@@ -15,6 +15,8 @@
  * - building blocks: small, flexible (spend_by_category, income_summary, …)
  * - ready-made insights: answer the challenge's flagship questions in one
  *   step (spender_profile, everyday_leaks, what_if, safe_to_spend, …)
+ * - home loan: mortgage_status (+ mortgage_financing for charts), from
+ *   lib/data/mortgage.ts. { hasMortgage: false } for customers who never applied.
  *
  * TO ADD A TOOL: write the function in lib/data or lib/insights, then add one
  * entry to TOOLS below. If it returns `rows`, set chartable: true and it can
@@ -48,6 +50,7 @@ import { recurringPayments } from "@/lib/insights/recurring";
 import { safeToSpend } from "@/lib/insights/safeToSpend";
 import { spenderProfile } from "@/lib/insights/spenderProfile";
 import { whatIf } from "@/lib/insights/whatIf";
+import { getMortgageSummary } from "@/lib/data/mortgage";
 
 type Args = Record<string, unknown>;
 
@@ -404,6 +407,47 @@ const TOOLS: Tool[] = [
     properties: {},
     chartable: true,
     run: () => irregularBuffer(),
+  },
+
+  // ── Home loan ──────────────────────────────────────────────────────────
+  {
+    name: "mortgage_status",
+    description:
+      "The user's home loan (mortgage) application: the bank's decision and rejection reason, property, loan, " +
+      "own money (equity), loan-to-value, collateral, costs the bank recorded, required monthly income, the user's " +
+      "average monthly income and spending (last 12 months), and a timeline. hasMortgage=false if they never applied.",
+    properties: {},
+    chartable: false,
+    run: () => {
+      const m = getMortgageSummary();
+      if (!m) return { hasMortgage: false };
+      return {
+        hasMortgage: true,
+        ...m,
+        // WHY: the bank's verdict is final data; the AI must not invent its own (see prompt).
+        note: "decision and rejectionReason are the bank's own record. requiredMonthlyIncomeEur is the bank's figure.",
+        // undefined fields are dropped by JSON.stringify (fewer tokens, no long notes)
+        timeline: m.timeline.map((e) => ({ ...e, note: undefined, time: undefined })),
+      };
+    },
+  },
+  {
+    name: "mortgage_financing",
+    description:
+      "Loan vs own money (equity) for the user's home, as chart rows. Use with show_chart (pie or bar). No period needed.",
+    properties: {},
+    chartable: true,
+    run: () => {
+      const m = getMortgageSummary();
+      return {
+        rows: m
+          ? [
+              { label: "Loan", value: m.loanEur },
+              { label: "Own money", value: m.equityEur },
+            ]
+          : [],
+      };
+    },
   },
 ];
 

@@ -14,6 +14,7 @@ import { explainLlmError, LLM_TIMEOUT_MS } from "@/lib/ai/chat";
 import { chatCompletion } from "@/lib/ai/llm";
 import { TOOL_DEFINITIONS } from "@/lib/ai/tools";
 import { getCustomerId, getDataToday, getTransactions } from "@/lib/data";
+import { withPickedCustomer } from "@/lib/data/request";
 
 type Check = { name: string; ok: boolean; info: string };
 
@@ -23,12 +24,16 @@ export async function GET(request: Request) {
 
   // 1. Data
   try {
-    const txs = getTransactions();
-    checks.push({
-      name: "data",
-      ok: txs.length > 0,
-      info: `customer=${getCustomerId()}, ${txs.length} transactions, ${txs[0]?.date} → ${getDataToday()}`,
-    });
+    checks.push(
+      await withPickedCustomer(() => {
+        const txs = getTransactions();
+        return {
+          name: "data",
+          ok: txs.length > 0,
+          info: `customer=${getCustomerId()}, ${txs.length} transactions, ${txs[0]?.date} → ${getDataToday()}`,
+        };
+      }),
+    );
   } catch (err) {
     checks.push({
       name: "data",
