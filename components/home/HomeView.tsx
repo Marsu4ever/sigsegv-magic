@@ -15,7 +15,7 @@
  *                                              last 7 days are on /week)
  *   5. upcoming payments     → /api/home      (predicted from past payments, next month;
  *                                              grouped before / after payday, tap for history)
- *   (set a goal line         → /api/goal      only when NO goal is set; GoalStartRow, quiet text)
+ *   (set a goal line         → /api/goal      only when NO goal is set; GoalStartRow, same section look)
  *   6. recent transactions   → /api/transactions?limit=6 (latest, across months; all + search on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
  * WHY each section loads on its own (own skeleton): a slow part doesn't hold up the rest.
@@ -132,7 +132,7 @@ export function HomeView() {
           </SkeletonGroup>
         )}
 
-        {/* Saving goal: one line, only when a goal is set; taps through to /week (DECISIONS.md #60c) */}
+        {/* Saving goal: a section like the rest, only when a goal is set; taps through to /week (DECISIONS.md #60c) */}
         <GoalStrip view={goal} />
 
         {/* 3. Coach insights (hides itself when there's nothing to say) */}
@@ -166,7 +166,7 @@ export function HomeView() {
           )}
         </CollapsibleSection>
 
-        {/* No goal yet: a quiet "Set a goal" line, low on purpose (DECISIONS.md #60c) */}
+        {/* No goal yet: a "Set a goal" card, low on purpose (DECISIONS.md #60c, #60d) */}
         <GoalStartRow view={goal} />
 
         {/* 6. Recent transactions */}
