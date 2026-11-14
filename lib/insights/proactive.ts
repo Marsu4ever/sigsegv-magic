@@ -15,6 +15,12 @@
  *   unusual         an everyday category this week ≥ 1.6× its usual week; a purchase ≥ 3×
  *                   bigger than 9 in 10 of the year's purchases; spending growing ≥ 10
  *                   points faster than income (last 3 months vs the 3 before)
+ *   save_help (tip) everyone else: the biggest everyday category (≥ €50 a month), 10 % less
+ *   risk            bills + surprise reserve before payday are more than the balance
+ *                   (the same safeToSpend() as Home and the coach) — can't be dismissed
+ *   positive        everyday spending this week ≤ 80 % of the usual week, or keeping ≥ 20 %
+ *                   of income over the last 3 full months (one positive card at most)
+ * Each insight also has a severity (risk / watch / info / good) and a short `cta` for the card.
  */
 import type { Basket, ChartRow, Insight, Transaction } from "@/lib/types";
 import {
@@ -28,6 +34,7 @@ import {
 } from "@/lib/data";
 import { addDays, endOfMonth, startOfMonth, toDate } from "@/lib/data/dates";
 import { recurringPayments, withoutMerchantId } from "./recurring";
+import { safeToSpend } from "./safeToSpend";
 
 // ─── Small helpers ───────────────────────────────────────────────────────
 
@@ -127,6 +134,7 @@ function saveHelp(): Insight | null {
   return {
     id: "save-help",
     kind: "save_help",
+    severity: overspending ? "risk" : "watch",
     title: overspending ? "You're spending more than you earn" : "You're keeping very little of your income",
     hook: `You could save ${plus(savePerMonth * 12)} a year`,
     detail:
@@ -142,6 +150,7 @@ function saveHelp(): Insight | null {
         : ""),
     table,
     total: { label: "Could save in a year", value: round2(savePerMonth * 12) },
+    cta: `Trim ${top.label.toLowerCase()} by 20 %`,
     ask: "How can I save more each month?",
   };
 }
@@ -215,12 +224,14 @@ function spendingAlert(): (Insight & { category: string }) | null {
   return {
     id: "spending-alert",
     kind: "spending_alert",
+    severity: "watch",
     category,
     title: `Your ${noun(category)} spending increased`,
     hook: `${category} up ${pct(spent / expected - 1)} ${when}`,
     detail: `You've spent ${minus(spent)} on ${category.toLowerCase()} ${when}, ${pct(spent / expected - 1)} more than usual.${driverText}`,
     why: `Compared with your average month for ${category.toLowerCase()}: ${minus(usual)} over the ${baseMonths} months before.`,
     action: `Try a weekly ${noun(category)} budget of about ${eur(weekly)}: your usual month spread over its weeks.`,
+    cta: `Set a weekly ${noun(category)} budget`,
     ask: `Why did my ${noun(category)} spending go up ${when}?`,
   };
 }
@@ -244,6 +255,7 @@ function recurring(): Insight | null {
   return {
     id: "recurring",
     kind: "recurring",
+    severity: "info",
     title: `You have ${items.length} recurring payments`,
     hook: `${minus(yearly / 12)} a month goes out on repeat`,
     detail: `Together they cost about ${minus(yearly / 12)} a month.`,
@@ -253,6 +265,7 @@ function recurring(): Insight | null {
       : "Review them to see whether you're still using all of them, and compare contracts for the bills.",
     table,
     total: { label: "Potential annual cost", value: round2(yearly) },
+    cta: "Review what you still use",
     ask: "Show my recurring payments",
   };
 }
@@ -276,12 +289,14 @@ function unusualThisWeek(today: string): (Insight & { category: string }) | null
   return {
     id: "unusual-week",
     kind: "unusual",
+    severity: "watch",
     category: best.category,
     title: `Your ${noun(best.category)} spending is unusually high this week`,
     hook: `${best.category} ${(best.spent / best.usual).toFixed(1)}× your usual week`,
     detail: `${minus(best.spent)} on ${c} in the last 7 days, about ${(best.spent / best.usual).toFixed(1)}× your usual week.`,
     why: `Your usual week for ${c}: ${minus(best.usual)} (average of the 12 weeks before).`,
     action: `Keep ${c} light for the next few days to get back to your usual ${eur(best.usual)} a week.`,
+    cta: `Keep ${c} light this week`,
     ask: `Why is my ${noun(best.category)} spending high this week?`,
   };
 }
@@ -301,12 +316,14 @@ function unusualPurchase(today: string): (Insight & { category: string }) | null
   return {
     id: "unusual-purchase",
     kind: "unusual",
+    severity: "watch",
     category: big.category,
     title: "A purchase much larger than usual",
     hook: `One ${minus(spentEur(big))} purchase stood out`,
     detail: `You paid ${minus(spentEur(big))} for ${what.toLowerCase()} on ${fi(big.date)}, much more than your usual purchase.`,
     why: `9 in 10 of your purchases in the past year were under ${eur(p90)}.`,
     action: "If you don't recognise it, check it with the bank. If it was planned, set a little aside each month so big buys don't surprise you.",
+    cta: "Check you recognise it",
     ask: `Tell me about my ${what.toLowerCase()} purchase on ${fi(big.date)}`,
   };
 }
@@ -333,6 +350,7 @@ function spendingOutgrowsIncome(today: string): Insight | null {
   return {
     id: "unusual-growth",
     kind: "unusual",
+    severity: "watch",
     title: "Your spending is growing faster than your income",
     hook: `Spending up ${pct(spendGrowth)}, income ${incomeGrowth < 0 ? "down" : "up"} ${pct(Math.abs(incomeGrowth))}`,
     detail:
@@ -340,7 +358,105 @@ function spendingOutgrowsIncome(today: string): Insight | null {
       (incomeGrowth < 0 ? `fell ${pct(-incomeGrowth)}.` : `grew only ${pct(incomeGrowth)}.`),
     why: `${span(recent)}: ${minus(b.spending)} spent and ${plus(b.income)} earned a month, vs ${span(earlier)}: ${minus(a.spending)} and ${plus(a.income)}.`,
     action: "Find the basket that grew the most and give it a monthly limit before the gap gets bigger.",
+    cta: "Put a limit on one basket",
     ask: "Why is my spending growing faster than my income?",
+  };
+}
+
+// ─── save_help (tip): a savings opportunity for everyone else ─────────────
+
+/** WHY 10 % (save_help uses 20 %): these customers already keep money; a small nudge is enough. */
+const SAVE_TIP_CUT = 0.1;
+
+function saveTip(): Insight | null {
+  const range = lastFullMonths(getDataToday(), 3);
+  const all = getTransactions(range);
+  const months = monthsWithData(all);
+  if (months < 2) return null;
+  const everyday = all.filter((t) => isSpending(t) && t.basket === "everyday");
+  const top = [...sumBy(everyday, (t) => t.category, spentEur)]
+    .map(([label, total]) => ({ label, perMonth: total / months }))
+    .sort((a, b) => b.perMonth - a.perMonth)[0];
+  if (!top || top.perMonth < 50) return null;
+  const c = top.label.toLowerCase();
+  const save = top.perMonth * SAVE_TIP_CUT;
+  return {
+    id: "save-tip",
+    kind: "save_help",
+    severity: "info",
+    title: `A saving opportunity in ${c}`,
+    hook: `Save ${plus(save)} a month on ${c}`,
+    detail: `${top.label} is your biggest everyday cost: about ${minus(top.perMonth)} a month in ${monthName(range.from)}–${monthName(range.to)}.`,
+    why: "Your everyday spending over the last 3 full months. Small cuts in the biggest category make the biggest difference.",
+    action: `Spending 10 % less on ${c} keeps about ${plus(save)} a month, ${plus(save * 12)} a year.`,
+    cta: `Try 10 % less on ${c}`,
+    ask: `What if I spent less on ${c}?`,
+  };
+}
+
+// ─── risk: bills before payday bigger than the balance ───────────────────
+
+function paydayRisk(): Insight | null {
+  const s = safeToSpend(7);
+  if (!s || s.shortfallEur <= 0) return null;
+  const until = s.nextPayday ? `before payday (${fi(s.nextPayday)})` : `in the next ${s.daysToPayday} days`;
+  const biggest = [...s.fixedCosts].sort((a, b) => b.amountEur - a.amountEur)[0];
+  return {
+    id: "risk-payday",
+    kind: "risk",
+    severity: "risk",
+    title: "Your bills before payday are more than your balance",
+    hook: `${minus(s.shortfallEur)} short ${until}`,
+    detail:
+      `Your balance is ${eur(s.balanceEur)}, but ${minus(s.fixedCostsBeforePaydayEur)} in fixed costs` +
+      (biggest ? ` (${biggest.name.toLowerCase()} on ${fi(biggest.date)})` : "") +
+      ` and a ${minus(s.surpriseBufferEur)} surprise reserve are due ${until}.`,
+    why: "Bills and savings expected on their usual day of the month, plus your average surprise costs for those days — the same numbers as Safe to spend on Home.",
+    action: `Keep spending to the essentials until payday. If you have savings, moving ${plus(s.shortfallEur)} covers the gap.`,
+    cta: "Plan the days until payday",
+    ask: "How do I get through to payday?",
+  };
+}
+
+// ─── positive: a good habit worth saying out loud ────────────────────────
+
+function lightWeek(today: string): Insight | null {
+  const everyday = (t: Transaction) => isSpending(t) && t.basket === ("everyday" satisfies Basket);
+  const now = getTransactions({ from: addDays(today, -6), to: today }).filter(everyday).reduce((s, t) => s + spentEur(t), 0);
+  const usual =
+    getTransactions({ from: addDays(today, -90), to: addDays(today, -7) })
+      .filter(everyday)
+      .reduce((s, t) => s + spentEur(t), 0) / 12;
+  if (usual < 30 || now > usual * 0.8) return null;
+  return {
+    id: "positive-week",
+    kind: "positive",
+    severity: "good",
+    title: "You're spending less than usual this week",
+    hook: `Everyday spending ${pct(1 - now / usual)} below your usual week`,
+    detail: `${minus(now)} on everyday things in the last 7 days, compared with your usual ${minus(usual)} a week.`,
+    why: "Your everyday spending (food, eating out, shopping, fun) in the last 7 days vs your average week over the 12 weeks before.",
+    action: `Nice work. Moving the ${plus(usual - now)} you didn't spend to savings today keeps it from slipping away.`,
+    cta: "Move the difference to savings",
+    ask: "How am I doing this week?",
+  };
+}
+
+function healthySaver(): Insight | null {
+  const h = moneyHealth();
+  if (!h || h.keptShare < 0.2) return null;
+  const kept = h.incomePerMonth - h.spendingPerMonth;
+  return {
+    id: "positive-saver",
+    kind: "positive",
+    severity: "good",
+    title: "You're keeping a healthy share of your income",
+    hook: `You keep ${pct(h.keptShare)} of what you earn`,
+    detail: `In ${monthName(h.range.from)}–${monthName(h.range.to)} you earned ${plus(h.incomePerMonth)} a month and kept ${plus(kept)} of it.`,
+    why: "Your income and spending over the last 3 full months. Keeping 20 % or more is a strong habit.",
+    action: "Keep it going: an automatic transfer to savings on payday makes it effortless.",
+    cta: "Automate it on payday",
+    ask: "How could I make my savings grow?",
   };
 }
 
@@ -358,12 +474,20 @@ export function proactiveInsights(): Insight[] {
     void _category;
     return insight;
   };
+  const week = unusualThisWeek(today);
+  const help = saveHelp();
+  // WHY one positive card at most, and no "light week" next to an unusually high week:
+  // the cards must never contradict each other.
+  const positive = (week ? null : lightWeek(today)) ?? healthySaver();
   return [
-    saveHelp(),
+    paydayRisk(),
+    help,
     strip(alert),
-    strip(sameAsAlert(unusualThisWeek(today)) as (Insight & { category: string }) | null),
+    strip(sameAsAlert(week) as (Insight & { category: string }) | null),
     strip(sameAsAlert(unusualPurchase(today)) as (Insight & { category: string }) | null),
     spendingOutgrowsIncome(today),
+    help ? null : saveTip(), // the tip only when the stronger save_help isn't there
     recurring(),
+    positive,
   ].filter((i): i is Insight => i !== null);
 }

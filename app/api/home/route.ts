@@ -15,7 +15,9 @@ export async function GET() {
   try {
     const body = await withPickedCustomer((): HomeExtrasResponse => {
       // WHY drop `rows`: that's the chart table for the chat; Home has its own layout.
-      const { rows: _rows, ...summary } = safeToSpend(7);
+      const full = safeToSpend(7);
+      if (!full) return { safeToSpend: null, upcoming: upcomingPayments() };
+      const { rows: _rows, ...summary } = full;
       void _rows;
       return { safeToSpend: summary, upcoming: upcomingPayments() };
     });
