@@ -1,13 +1,22 @@
 # Shortcuts for the Money Coach app. Needs Node.js 20.9+ (with nvm: `nvm use`).
 #
-#   make         run the app → http://localhost:3000 (installs packages only when needed)
+#   make         list these commands
+#   make dev     run the app → http://localhost:3000 (installs packages only when needed)
 #   make phone   same, but a phone on the same wifi can open it (use the "Network" address it prints)
 #   make check   typecheck + lint — run before pushing
 #   make data    rebuild data/demo/ from the raw CSVs in data/raw/ (see README)
 #
 # Pick the demo customer in the app itself (top of the screen).
 
-.PHONY: dev phone check data
+# WHY: plain `make` lists the commands instead of starting something.
+.DEFAULT_GOAL := help
+.PHONY: help dev phone check data
+
+help:
+	@echo "make dev     run the app with live reload → http://localhost:3000"
+	@echo "make phone   same, reachable from a phone on the same wifi (use the Network address)"
+	@echo "make check   typecheck + lint — run before pushing"
+	@echo "make data    rebuild data/demo/ from the raw CSVs in data/raw/ (see README)"
 
 dev: node_modules .env.local
 	npm run dev

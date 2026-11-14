@@ -9,6 +9,7 @@ import { listDataFiles } from "@/lib/data/files";
 import { getAiConfig } from "@/lib/ai/config";
 import { Code, DevPage, Section } from "@/components/dev/DevPage";
 import { ForPickedCustomer } from "@/components/dev/ForPickedCustomer";
+import { versionLabel } from "@/lib/version";
 
 const PAGES = [
   {
@@ -69,6 +70,9 @@ function DevHubBody() {
           </li>
           <li>
             AI: <Code>{ai.mode === "mock" ? "mock (no real AI)" : ai.model}</Code>
+          </li>
+          <li>
+            Version: <Code>{versionLabel()}</Code>
           </li>
           <li className="text-xs text-muted">
             Switch customer with the dark <b>DEMO</b> bar at the top (per device; the default is{" "}
