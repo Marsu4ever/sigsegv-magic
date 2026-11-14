@@ -25,25 +25,31 @@ const TABS: { href: string; label: string; icon: IconName; also?: string[] }[] =
 export function TabBar() {
   const pathname = usePathname();
   return (
-    <nav className="flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+    // WHY not position:fixed: the app shell (app/layout.tsx) is a full-height column, so the bar
+    // always sits at the bottom and pages scroll above it — nothing is ever hidden behind it.
+    <nav aria-label="Main" className="flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
       {TABS.map((tab) => {
         const active = [tab.href, ...(tab.also ?? [])].some((p) => pathname.startsWith(p));
         return (
           <Link
             key={tab.href}
             href={tab.href}
+            aria-current={active ? "page" : undefined}
             // Tapping Chat always starts fresh: back to the suggested questions.
             onClick={() => {
               tapHaptic();
               if (tab.href === "/chat") requestChatReset();
             }}
-            className={`group flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] transition-colors ${
+            className={`group flex flex-1 flex-col items-center gap-0.5 pt-1.5 pb-1.5 text-[11px] transition-colors ${
               active ? "font-semibold text-accent" : "text-muted hover:text-foreground"
             }`}
           >
-            {/* Icon presses in on tap and lifts a little when its tab becomes active. */}
+            {/* Icon presses in on tap and lifts a little when its tab becomes active.
+                WHY the soft pill behind the active icon: colour alone is easy to miss. */}
             <span
-              className={`transition-transform duration-200 group-active:scale-90 ${active ? "-translate-y-0.5" : ""}`}
+              className={`flex h-7 w-14 items-center justify-center rounded-full transition-all duration-200 group-active:scale-90 ${
+                active ? "-translate-y-0.5 bg-accent/12" : ""
+              }`}
             >
               <Icon name={tab.icon} size={22} strokeWidth={active ? 2.2 : 1.8} />
             </span>

@@ -79,7 +79,12 @@ function PurchasesSheet({
         </li>
       </ul>
       <Link
-        href={`/activity?month=${newestFirst[0]?.date.slice(0, 7) ?? ""}`}
+        // WHY these filters: Activity opens on exactly these payments (category + merchant type, that month).
+        href={`/activity?${new URLSearchParams({
+          month: newestFirst[0]?.date.slice(0, 7) ?? "",
+          category,
+          ...(merchant.name !== "Other" ? { q: merchant.name } : {}),
+        })}`}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-line py-3 text-sm font-semibold"
       >
         <Icon name="activity" size={18} /> See them in Activity

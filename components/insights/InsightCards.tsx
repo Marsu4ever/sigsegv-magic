@@ -19,6 +19,7 @@ import { formatValue } from "@/components/charts/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 
 const KIND: Record<InsightKind, { label: string; icon: IconName }> = {
   risk: { label: "Coming up", icon: "alert" },
@@ -184,6 +185,9 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
   const [insights, setInsights] = useState<Insight[] | null>(null);
   const [open, setOpen] = useState<Insight | null>(null);
   const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : loadHidden()));
+  // WHY its own state (was: an empty list): a failed request must not say "All clear".
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     fetch("/api/insights")
@@ -191,13 +195,13 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
         const json = await res.json();
         if (!res.ok) throw new Error(json.detail || json.error);
         setInsights((json as InsightsResponse).insights);
+        setFailed(false);
       })
-      // WHY quiet: insights are extra; the rest of Home still works.
       .catch((err) => {
         console.error("[insights]", err);
-        setInsights([]);
+        setFailed(true);
       });
-  }, []);
+  }, [attempt]);
 
   function hide(i: Insight) {
     const next = [...hidden.filter((k) => k !== keyOf(i)), keyOf(i)];
@@ -212,23 +216,45 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
     saveHidden(next);
   }
 
+  if (failed && !insights) {
+    // Insights are extra: say they're missing, offer a retry, and let the rest of Home work.
+    return (
+      <CollapsibleSection id="insights" title={title}>
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
+          <Icon name="alert" size={18} className="shrink-0 text-muted" />
+          <p className="min-w-0 flex-1 text-sm text-muted">Couldn&apos;t load the coach&apos;s insights right now.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setFailed(false);
+              setAttempt((n) => n + 1);
+            }}
+            className="shrink-0 text-xs font-semibold text-accent"
+          >
+            Try again
+          </button>
+        </div>
+      </CollapsibleSection>
+    );
+  }
   if (!insights) {
     return (
-      <SkeletonGroup>
-        <Skeleton className="mb-2 ml-1 h-4 w-28" />
-        <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 pb-1">
-          {[0, 1].map((i) => (
-            <div key={i} className="flex w-[80%] shrink-0 items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
-              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-2.5 w-1/2" />
-                <Skeleton className="h-3.5 w-4/5" />
-                <Skeleton className="h-2.5 w-2/5" />
+      <CollapsibleSection id="insights" title={title}>
+        <SkeletonGroup>
+          <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 pb-1">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex w-[80%] shrink-0 items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
+                <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-2.5 w-1/2" />
+                  <Skeleton className="h-3.5 w-4/5" />
+                  <Skeleton className="h-2.5 w-2/5" />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </SkeletonGroup>
+            ))}
+          </div>
+        </SkeletonGroup>
+      </CollapsibleSection>
     );
   }
 
@@ -236,15 +262,18 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
   const hiddenCount = insights.length - visible.length;
 
   return (
-    <section>
-      <div className="mb-2 flex items-baseline justify-between px-1">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {hiddenCount > 0 && visible.length > 0 && (
+    <CollapsibleSection
+      id="insights"
+      title={title}
+      aside={
+        hiddenCount > 0 &&
+        visible.length > 0 && (
           <button type="button" onClick={showHidden} className="text-xs font-medium text-accent">
             Show hidden ({hiddenCount})
           </button>
-        )}
-      </div>
+        )
+      }
+    >
 
       {visible.length === 0 ? (
         <AllClear hiddenCount={hiddenCount} onShow={showHidden} />
@@ -291,6 +320,6 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
       )}
 
       {open && <InsightSheet insight={open} onClose={() => setOpen(null)} onHide={() => hide(open)} />}
-    </section>
+    </CollapsibleSection>
   );
 }

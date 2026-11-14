@@ -403,6 +403,24 @@ export type AccountTransaction = {
   kind: "spending" | "income" | "savings_move";
 };
 
+/**
+ * GET /api/transactions — search the customer's transactions (Activity, and Home's recent list).
+ * Query: month (YYYY-MM | latest) or from / to (YYYY-MM-DD), q (merchant type or category),
+ * category (exact), type (all | income | expense), sort (newest | oldest), offset, limit. Added 15 Nov.
+ */
+export type TransactionSearch = {
+  range: DateRange; // the dates searched (defaults to all the data)
+  dataRange: DateRange | null; // first … last transaction (min / max for date pickers); null = no data
+  asOf: string;
+  /** Categories in the searched dates (before the category filter), for the filter list. */
+  categories: { name: string; count: number }[];
+  count: number; // all matching transactions (not just this page)
+  incomeEur: number; // money in among the matches
+  spendingEur: number; // money out among the matches (moves to own savings are neither)
+  transactions: AccountTransaction[]; // this page, in the requested order
+  nextOffset: number | null; // null = this was the last page
+};
+
 /** GET /api/account?month=YYYY-MM response body. */
 export type AccountSummary = {
   /** null when the customer has no transactions at all (never shown as a made-up value). Changed 15 Nov. */
@@ -492,18 +510,38 @@ export type SafeDay = {
   payments: UpcomingPayment[]; // fixed costs expected that day
 };
 
-/** A bill, subscription or automatic saving expected soon (from recurring payments). Added 14 Nov. */
+/**
+ * A bill, subscription or automatic saving expected soon (from recurring payments). Added 14 Nov;
+ * prediction details 15 Nov.
+ * WHY `status`: everything in the demo data is a PREDICTION from past payments — there are no
+ * bank-scheduled payments. "scheduled" is kept for a real bank feed; the UI labels both clearly.
+ */
 export type UpcomingPayment = {
   name: string; // "Housing", "Streaming"
   category: string;
   kind: "bill" | "subscription" | "automatic_saving";
+  status: "predicted" | "scheduled";
   date: string; // expected date: its usual day of the month, next time it comes round
   inDays: number;
-  amountEur: number; // its usual amount (positive)
+  /** The last payment when it's always (almost) the same, else the average (amountIsEstimate). */
+  amountEur: number;
+  amountIsEstimate: boolean;
+  minAmountEur: number; // over the last 12 months
+  maxAmountEur: number;
+  dayRange: [number, number]; // earliest / latest day of the month it was paid
+  monthsSeen: number; // of the last 12
+  /** Why it counts as recurring, in plain words. */
+  reason: string;
+  /** Its payments over the last 12 months, newest first (positive euros). */
+  history: { date: string; amountEur: number }[];
 };
 
 /** GET /api/home — the Home tab parts no other endpoint has. safeToSpend null = no transactions. Added 14 Nov. */
-export type HomeExtrasResponse = { safeToSpend: SafeToSpendSummary | null; upcoming: UpcomingPayment[] };
+export type HomeExtrasResponse = {
+  safeToSpend: SafeToSpendSummary | null;
+  upcoming: UpcomingPayment[]; // next 31 days, by date
+  upcomingTotalEur: number; // their sum (added 15 Nov)
+};
 
 // ─── What-if / forecast ──────────────────────────────────────────────────
 

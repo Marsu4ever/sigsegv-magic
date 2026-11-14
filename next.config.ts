@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
     APP_COMMIT: buildCommit(),
     APP_BUILT_AT: new Date().toISOString(),
   },
+  // WHY here, not as pages that call redirect(): a redirecting page logged a prerender error
+  // on every dev request. "/" opens Home; the old Account tab became Home + Activity.
+  redirects() {
+    return [
+      { source: "/", destination: "/home", permanent: false },
+      { source: "/account", destination: "/home", permanent: false },
+    ];
+  },
   // Defaults from create-next-app (Next.js 16).
   cacheComponents: true,
   partialPrefetching: true,
