@@ -34,7 +34,8 @@ import { CountUp } from "@/components/ui/CountUp";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 
-const TYPE_COLOR: Record<Basket, string> = {
+/** Basket colours, also used by the Spending breakdown on Home. */
+export const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
   mandatory_irregular: "var(--accent)", // the app's green
   everyday: "color-mix(in srgb, var(--accent) 62%, white)", // light green

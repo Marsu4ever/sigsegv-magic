@@ -7,9 +7,11 @@
  * can I spend, anything I should know, where did it go, what's coming, what just happened"):
  *   1. account overview      → /api/account   (balance, change since last month, income /
  *                                              expenses / net; details in a sheet)
- *   2. safe to spend         → /api/home      (= the coach's safe_to_spend tool)
+ *   2. safe to spend         → /api/home      (= the coach's safe_to_spend tool; the pace bar
+ *                                              also uses /api/week's last-7-days total)
  *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
- *   4. spending breakdown    → /api/week      (the "Last 7 days" hero + podium; details on /week)
+ *   4. spending breakdown    → /api/spending  (the month in the 3 baskets, expandable; the
+ *                                              last 7 days are on /week)
  *   5. upcoming payments     → /api/home      (recurring bills / savings, next month)
  *   6. recent transactions   → /api/account   (latest few; everything on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
@@ -17,12 +19,12 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AccountSummary, Basket, HomeExtrasResponse, WeekSummary } from "@/lib/types";
+import type { AccountSummary, HomeExtrasResponse, WeekSummary } from "@/lib/types";
 import { AccountOverview } from "./AccountOverview";
 import { TransactionDayList } from "@/components/account/TransactionList";
 import { InsightCards } from "@/components/insights/InsightCards";
-import { Hero, TopCategories } from "@/components/week/WeekView";
 import { SafeToSpendCard } from "./SafeToSpendCard";
+import { SpendingBreakdown } from "./SpendingBreakdown";
 import { UpcomingPayments } from "./UpcomingPayments";
 import { DevHeaderButton } from "@/components/DevButton";
 import { Icon } from "@/components/ui/Icon";
@@ -88,9 +90,6 @@ export function HomeView() {
   const account = useJson<AccountSummary>("/api/account");
   const extras = useJson<HomeExtrasResponse>("/api/home");
   const week = useJson<WeekSummary>("/api/week");
-  // The tapped type of expense in the spending breakdown (same behaviour as the Week page).
-  const [focus, setFocus] = useState<Basket | null>(null);
-  const toggle = (b: Basket) => setFocus(focus === b ? null : b);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -124,7 +123,14 @@ export function HomeView() {
         {extras.error ? (
           <SectionError text={extras.error} />
         ) : extras.data ? (
-          <SafeToSpendCard s={extras.data.safeToSpend} />
+          extras.data.safeToSpend ? (
+            <SafeToSpendCard s={extras.data.safeToSpend} weekSpentEur={week.data?.totalSpentEur ?? null} />
+          ) : (
+            // No transactions: nothing to base it on, so no number at all.
+            <p className="rounded-2xl bg-surface p-4 text-sm text-muted shadow-sm">
+              Safe to spend needs some account history first.
+            </p>
+          )
         ) : (
           <SkeletonGroup>
             <SkeletonCard lines={3} />
@@ -134,29 +140,9 @@ export function HomeView() {
         {/* 3. Coach insights (hides itself when there's nothing to say) */}
         <InsightCards title="Coach insights" />
 
-        {/* 4. Spending breakdown, last 7 days */}
-        <Section title="Spending, last 7 days" link={{ href: "/week", label: "Details" }}>
-          {week.error ? (
-            <SectionError text={week.error} />
-          ) : week.data ? (
-            // WHY: a tap outside the type buttons clears the highlight, like on the Week page.
-            <div
-              className="space-y-3"
-              onClick={(e) => {
-                if (focus && !(e.target as Element).closest("[data-type-select]")) setFocus(null);
-              }}
-            >
-              <Hero data={week.data} focus={focus} onFocus={toggle} />
-              {week.data.topCategories.length > 0 && (
-                <TopCategories data={week.data} focus={focus} onFocus={toggle} limit={3} />
-              )}
-            </div>
-          ) : (
-            <SkeletonGroup className="space-y-3">
-              <SkeletonCard lines={2} />
-              <SkeletonCard lines={3} />
-            </SkeletonGroup>
-          )}
+        {/* 4. Spending breakdown: the month in the 3 baskets (the 7-day view is one tap away) */}
+        <Section title="Spending breakdown" link={{ href: "/week", label: "Last 7 days" }}>
+          <SpendingBreakdown />
         </Section>
 
         {/* 5. Upcoming payments */}
