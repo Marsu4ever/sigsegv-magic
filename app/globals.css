@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/*
+ * Theme colors in ONE place. Owner: UI person.
+ * WHY CSS variables: change the look of the whole app here (e.g. to match
+ * S-mobiili more closely) without hunting through components.
+ * Use them in Tailwind as e.g. bg-accent, text-muted, border-line.
+ */
+:root {
+  --background: #f6f7f5;
+  --surface: #ffffff;
+  --foreground: #1a1d1a;
+  --muted: #6b716b;
+  --line: #e3e6e2;
+  --accent: #00855f;
+  --accent-foreground: #ffffff;
+
+  /* One color per basket — used by charts and the Week tab. */
+  --basket-regular: #2f6fd6;
+  --basket-irregular: #e08a00;
+  --basket-everyday: #d6455d;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  /* WHY system fonts: next/font/google downloads fonts at build time, which
+     can fail on hackathon wifi. System fonts also look native on phones. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
