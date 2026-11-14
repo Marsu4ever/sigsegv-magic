@@ -7,6 +7,7 @@
 import { useEffect } from "react";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
+import { ChartTitle } from "./ChartTitle";
 
 export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: () => void }) {
   // Close with the Escape key (handy when testing on a laptop).
@@ -33,7 +34,9 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
           >
             ← Back
           </button>
-          <h2 className="min-w-0 flex-1 truncate font-semibold">{spec.title}</h2>
+          <h2 className="min-w-0 flex-1 truncate font-semibold">
+            <ChartTitle spec={spec} />
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -49,7 +52,8 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
           {spec.type !== "table" &&
             spec.type !== "heatmap" &&
             spec.type !== "cumulative" &&
-            spec.type !== "baskets" && (
+            spec.type !== "baskets" &&
+            spec.type !== "leaks" && (
               <div className="mt-4">
                 <ChartRenderer spec={{ ...spec, type: "table" }} compact={false} />
               </div>

@@ -70,7 +70,8 @@ export type DateRange = { from: string; to: string };
  * "cumulative" = month so far: running total per day of month, with a
  * projection to month end and last month as a dashed line (month_progress).
  */
-export type ChartType = "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative" | "baskets";
+export type ChartType =
+  "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative" | "baskets" | "leaks";
 
 /**
  * One row of a chart. `value2` is optional: when set, the chart compares two
@@ -108,10 +109,38 @@ export type ChartSpec = {
    * ‹ › arrows can go. Months are "YYYY-MM". Other months: GET /api/month-progress.
    */
   monthNav?: { shown: string; first: string; last: string };
+  /** "leaks" charts: small purchases, habits, skip chips, the drip jar. */
+  leaks?: LeaksView;
   /** "baskets" charts: baskets → categories → merchant types, biggest first. */
   baskets?: BasketGroup[];
   /** Human-readable period the chart covers, e.g. "1.9.–29.9.2026". */
   periodLabel?: string;
+};
+
+/** Screen data for the "leaks" chart (see lib/insights/leaks.ts). */
+export type LeaksView = {
+  everydayPerYearEur: number; // the whole "everything else" basket, per year
+  smallMaxEur: number;
+  smallPerYearEur: number;
+  smallCount: number; // small purchases in the period
+  smallTotalEur: number; // their total in the period
+  periodDays: number;
+  /** The 2 weekdays with the most everyday spending and their share (0–1). */
+  leakiestDays: { days: [string, string]; share: number } | null;
+  habits: {
+    name: string; // merchant type, e.g. "Fast food"
+    category: string; // for the icon
+    timesPerMonth: number;
+    averageEur: number;
+    perYearEur: number;
+    /** What skipping one would save a year, or null if it's too rare. */
+    skip: { label: string; savesPerYearEur: number } | null;
+  }[];
+  /**
+   * Every everyday purchase in the period, oldest first — the marbles in the
+   * jar. `habit` = the habit card it belongs to (merchant type or category).
+   */
+  drops: { date: string; amount: number; habit: string }[];
 };
 
 /** One basket with its categories and what's inside them (see basketTree.ts). */

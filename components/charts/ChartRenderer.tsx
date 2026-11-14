@@ -23,6 +23,7 @@ import {
 import type { ChartSpec } from "@/lib/types";
 import { basketColor, colorFor } from "./colors";
 import { BasketsChart } from "./Baskets";
+import { LeaksChart } from "./Leaks";
 import { HeatmapExplorer, HeatmapPreview } from "./Heatmap";
 import { CumulativeChart } from "./Cumulative";
 
@@ -56,6 +57,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   }
   if (spec.type === "cumulative") return <CumulativeChart spec={spec} compact={compact} />;
   if (spec.type === "baskets") return <BasketsChart spec={spec} compact={compact} />;
+  if (spec.type === "leaks") return <LeaksChart spec={spec} compact={compact} />;
 
   const monthly = isMonthly(spec.rows);
   // Two series side by side (e.g. "You" vs "Typical")? Only when rows have value2.

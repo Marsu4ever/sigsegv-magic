@@ -71,3 +71,127 @@ body {
 .chart-flash {
   animation: chart-flash-fade 1.6s ease-out forwards;
 }
+
+/* "Leaks" chart animations. Everything is switched off for people who ask
+   their system for reduced motion (see the media query at the end). */
+
+/* Each small purchase drops into the jar and bounces a little on landing. */
+@keyframes jar-drop-in {
+  0% {
+    transform: translateY(var(--fall));
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(0);
+  }
+  84% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.jar-drop {
+  animation: jar-drop-in 0.7s ease-in both;
+}
+
+/* Cards and lines slide up into place one after another. */
+@keyframes leak-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.leak-fade-up {
+  animation: leak-fade-up 0.45s ease-out both;
+}
+
+/* The "skipping saves you" line and a pressed chip pop in. */
+@keyframes leak-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.leak-pop {
+  animation: leak-pop 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jar-drop,
+  .leak-fade-up,
+  .leak-pop {
+    animation: none;
+  }
+}
+
+/* "Leaks" jar: a marble that turns green pops once (scales from its centre). */
+@keyframes marble-green-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.marble-green {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marble-green-pop 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marble-green {
+    animation: none;
+  }
+}
+
+/* "Leaks" jar: gold ("sparks joy") marbles pop once, then shimmer gently. */
+@keyframes marble-gold-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes marble-shimmer {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+.marble-gold {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    marble-gold-pop 0.45s ease-out,
+    marble-shimmer 2.4s ease-in-out 0.45s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marble-gold {
+    animation: none;
+  }
+}

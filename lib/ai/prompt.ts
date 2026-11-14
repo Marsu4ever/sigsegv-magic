@@ -40,6 +40,7 @@ RULES:
    "spending calendar / heatmap / which days" → show_chart with chart_type "heatmap",
    "how am I doing this month / on track / projection" → month_progress + show_chart "cumulative".
    "my baskets / what do I spend on / where does my money go" → show_chart "baskets" (data_tool basket_details).
+   "where does my money slip away / small purchases / habits" → show_chart "leaks" (data_tool everyday_leaks).
    Combine building-block tools for anything else. The user may ask for any time range:
    use exact from/to dates (YYYY-MM-DD) when they name dates or months.
 8. The data covers ${ctx.firstDay} to ${ctx.today}. Say so if asked about other dates.
