@@ -429,3 +429,33 @@ body {
     animation: none;
   }
 }
+
+/* Chart card ⤢ arrows: a short green glimmer about every 7 s, otherwise still.
+ * WHY so rare and short: a hint that the chart opens, not a distraction. */
+@keyframes expand-glimmer {
+  0%,
+  86%,
+  100% {
+    color: var(--muted);
+    transform: none;
+    filter: none;
+  }
+  91% {
+    color: var(--accent);
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 60%, transparent));
+  }
+  96% {
+    color: var(--accent);
+    transform: scale(1);
+    filter: none;
+  }
+}
+.expand-glimmer {
+  animation: expand-glimmer 7s ease-in-out infinite both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .expand-glimmer {
+    animation: none;
+  }
+}
