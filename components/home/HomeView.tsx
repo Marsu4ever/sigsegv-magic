@@ -12,7 +12,8 @@
  *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
  *   4. spending breakdown    → /api/spending  (the month in the 3 baskets, expandable; the
  *                                              last 7 days are on /week)
- *   5. upcoming payments     → /api/home      (recurring bills / savings, next month)
+ *   5. upcoming payments     → /api/home      (predicted from past payments, next month;
+ *                                              grouped before / after payday, tap for history)
  *   6. recent transactions   → /api/account   (latest few; everything on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
  * WHY each section loads on its own (own skeleton): a slow part doesn't hold up the rest.
@@ -150,7 +151,12 @@ export function HomeView() {
           {extras.error ? (
             <SectionError text={extras.error} />
           ) : extras.data ? (
-            <UpcomingPayments items={extras.data.upcoming} />
+            <UpcomingPayments
+              items={extras.data.upcoming}
+              nextPayday={extras.data.safeToSpend?.nextPayday ?? null}
+              beforePaydayEur={extras.data.safeToSpend?.fixedCostsBeforePaydayEur}
+              totalEur={extras.data.upcomingTotalEur}
+            />
           ) : (
             <SkeletonGroup className="overflow-hidden rounded-2xl bg-surface shadow-sm">
               <SkeletonRows rows={3} />

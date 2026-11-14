@@ -50,24 +50,24 @@ function median(xs: number[]): number {
   return v.length ? v[Math.floor(v.length / 2)] : 0;
 }
 
-export function recurringPayments(): {
-  window: { from: string; to: string };
-  items: RecurringItem[];
-  rows: ChartRow[];
-} {
+/** One detected group: the summary item, its payments (oldest first) and how much the price varies. */
+type Group = { item: RecurringItem; txs: Transaction[]; variation: number };
+
+/** Groups the last 12 months of outgoing payments and keeps the ones that come back. */
+function detectRecurring(): { window: { from: string; to: string }; groups: Group[] } {
   const to = getDataToday();
   const from = addDays(to, -364);
-  const groups = new Map<string, Transaction[]>();
+  const byKey = new Map<string, Transaction[]>();
   for (const t of getTransactions({ from, to })) {
     if (t.amountEur >= 0) continue;
     const saving = categoryKind(t.category) === "savings_move";
     if (!saving && !isSpending(t)) continue;
     const key = t.merchantId || `cat:${t.category}`;
-    groups.set(key, [...(groups.get(key) ?? []), t]);
+    byKey.set(key, [...(byKey.get(key) ?? []), t]);
   }
 
-  const items: RecurringItem[] = [];
-  for (const [key, txs] of groups) {
+  const groups: Group[] = [];
+  for (const [key, txs] of byKey) {
     const months = new Set(txs.map((t) => t.date.slice(0, 7))).size;
     if (months < MIN_MONTHS) continue;
     const amounts = txs.map((t) => -t.amountEur);
@@ -86,20 +86,33 @@ export function recurringPayments(): {
     else if (isMerchant) kind = "habit";
     else continue; // e.g. "all Entertainment without merchant" — not one recurring thing
 
-    items.push({
-      kind,
-      name: isMerchant
-        ? `${merchantType(first.mccCode) ?? first.category} ${first.merchantId}`
-        : first.category,
-      category: first.category,
-      monthsSeen: months,
-      timesSeen: txs.length,
-      averageAmountEur: round2(avg),
-      perMonthEur: round2(total / 12),
-      typicalDayOfMonth: median(txs.map((t) => Number(t.date.slice(8, 10)))),
+    groups.push({
+      txs,
+      variation,
+      item: {
+        kind,
+        name: isMerchant
+          ? `${merchantType(first.mccCode) ?? first.category} ${first.merchantId}`
+          : first.category,
+        category: first.category,
+        monthsSeen: months,
+        timesSeen: txs.length,
+        averageAmountEur: round2(avg),
+        perMonthEur: round2(total / 12),
+        typicalDayOfMonth: median(txs.map((t) => Number(t.date.slice(8, 10)))),
+      },
     });
   }
+  return { window: { from, to }, groups };
+}
 
+export function recurringPayments(): {
+  window: { from: string; to: string };
+  items: RecurringItem[];
+  rows: ChartRow[];
+} {
+  const { window, groups } = detectRecurring();
+  const items = groups.map((g) => g.item);
   const order: RecurringKind[] = ["bill", "subscription", "automatic_saving", "habit"];
   items.sort(
     (a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || b.perMonthEur - a.perMonthEur,
@@ -109,7 +122,7 @@ export function recurringPayments(): {
   const kept = [...items.filter((i) => i.kind !== "habit"), ...habits];
 
   return {
-    window: { from, to },
+    window,
     items: kept,
     rows: kept.map((i) => ({
       label: `${i.name} (${i.kind.replace("_", " ")})`,
@@ -118,27 +131,70 @@ export function recurringPayments(): {
   };
 }
 
+/** WHY 5 %: below that a payment is "the same amount every time" (rounding, small price changes). */
+const STEADY_AMOUNT = 0.05;
+
+const ordinal = (n: number) =>
+  `${n}${n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th"}`;
+
+/** Why this payment counts as recurring, in plain words (shown when a payment is opened). */
+function reasonFor(g: Group): string {
+  const i = g.item;
+  const when = `usually around the ${ordinal(i.typicalDayOfMonth)}`;
+  const seen = `${i.monthsSeen} of the last 12 months`;
+  const perMonth = Math.round(i.timesSeen / i.monthsSeen);
+  const often = perMonth >= 2 ? ` It often comes about ${perMonth} times a month; this is the next one.` : "";
+  if (i.kind === "bill")
+    return `Paid in ${seen}, ${when}. It's a ${i.category.toLowerCase()} payment: a bill that comes back every month.${often}`;
+  if (i.kind === "subscription") {
+    const price =
+      g.variation < 0.01 ? "the same price every time" : `a steady price (it varies by about ${Math.round(g.variation * 100)} %)`;
+    return `Paid to the same merchant in ${seen}, ${when}, at ${price}.`;
+  }
+  return `A transfer to your own savings or investments in ${seen}, ${when}.${often}`;
+}
+
 /**
- * Bills, subscriptions and automatic savings expected in the next `days` days (Home tab).
- * WHY "usual day of the month": the data has no due dates; each recurring payment's typical
- * day (median of the last 12 months) is the best guess, the same one safe_to_spend relies on.
+ * Bills, subscriptions and automatic savings expected in the next `days` days (Home tab, and
+ * safe_to_spend counts the ones before payday).
+ * WHY these are PREDICTIONS (status "predicted"): the data has no due dates or scheduled
+ * payments. The date is the payment's usual day of the month (median of the last 12 months);
+ * the amount is the last payment when it's always (almost) the same, else the average — then
+ * `amountIsEstimate` is true and the UI shows "≈" and the range. Nothing here is guaranteed.
  * Habits are left out: a favourite restaurant isn't a payment you must plan for.
  */
 export function upcomingPayments(days = 31): UpcomingPayment[] {
   const today = getDataToday();
   const out: UpcomingPayment[] = [];
-  for (const i of recurringPayments().items) {
+  for (const g of detectRecurring().groups) {
+    const i = g.item;
     if (i.kind === "habit") continue;
     const date = nextDayOfMonth(today, i.typicalDayOfMonth);
     const inDays = Math.round((toDate(date).getTime() - toDate(today).getTime()) / 86_400_000);
     if (inDays > days) continue;
+    const amounts = g.txs.map((t) => -t.amountEur);
+    const min = Math.min(...amounts);
+    const max = Math.max(...amounts);
+    const steady = max - min <= max * STEADY_AMOUNT;
+    const last = g.txs[g.txs.length - 1];
+    const daysOfMonth = g.txs.map((t) => Number(t.date.slice(8, 10)));
     out.push({
       name: withoutMerchantId(i.name),
       category: i.category,
       kind: i.kind,
+      status: "predicted",
       date,
       inDays,
-      amountEur: i.averageAmountEur,
+      amountEur: steady ? round2(-last.amountEur) : i.averageAmountEur,
+      amountIsEstimate: !steady,
+      minAmountEur: round2(min),
+      maxAmountEur: round2(max),
+      dayRange: [Math.min(...daysOfMonth), Math.max(...daysOfMonth)],
+      monthsSeen: i.monthsSeen,
+      reason: reasonFor(g),
+      history: g.txs
+        .map((t) => ({ date: t.date, amountEur: round2(-t.amountEur) }))
+        .reverse(),
     });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || b.amountEur - a.amountEur);
