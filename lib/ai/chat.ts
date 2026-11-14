@@ -58,6 +58,28 @@ function ms(start: number): string {
   return `${Date.now() - start}ms`;
 }
 
+/**
+ * Chart safety net. WHY: real models sometimes answer in text only and forget
+ * show_chart (Qwen did for "How are my 3 baskets looking?"). For the questions
+ * the mock understands (baskets, calendar, month so far, slips away…) we add
+ * the chart the mock would show — same keywords, same real data, same tools —
+ * so the app looks the same with or without the real AI. The AI's text stays.
+ */
+function fallbackCharts(history: ChatMessage[]): ChartSpec[] {
+  try {
+    const found = mockReply(history).charts ?? [];
+    if (found.length > 0) {
+      console.log(
+        `[ai] model drew no chart — added ${found.map((c) => c.type).join(", ")} (keyword fallback)`,
+      );
+    }
+    return found;
+  } catch (err) {
+    console.warn("[ai] chart fallback failed:", err);
+    return [];
+  }
+}
+
 export async function runChat(history: ChatMessage[]): Promise<{
   reply: ChatMessage;
   mode: "live" | "mock";
@@ -121,7 +143,11 @@ export async function runChat(history: ChatMessage[]): Promise<{
       );
       if (!msg.content) console.warn("[ai] warning: final answer is empty");
       return {
-        reply: { role: "assistant", text: msg.content ?? "", charts },
+        reply: {
+          role: "assistant",
+          text: msg.content ?? "",
+          charts: charts.length > 0 ? charts : fallbackCharts(history),
+        },
         mode: "live",
       };
     }
