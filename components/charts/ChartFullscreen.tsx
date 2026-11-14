@@ -27,14 +27,8 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
         className="flex h-dvh w-full max-w-md flex-col bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center gap-2 border-b border-line px-3 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-full border border-line px-2.5 py-1 text-xs text-accent"
-          >
-            ← Back
-          </button>
+        {/* WHY only an X (no "← Back"): both did the same thing; matches BottomSheet. */}
+        <header className="flex items-center gap-2 border-b border-line py-3 pl-4 pr-2">
           <h2 className="min-w-0 flex-1 truncate font-semibold">
             <ChartTitle spec={spec} />
           </h2>
