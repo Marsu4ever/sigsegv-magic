@@ -330,12 +330,10 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     return reply(`In the last 7 days you've spent ${minus(total)}.`, c);
   }
 
-  return reply(
-    'I\'m a placeholder until the real AI is connected. Try: "what kind of spender am I", ' +
-      '"where does my money slip away", "what if I spend 20% less on restaurants", ' +
-      '"how much could I save if I reduce taxi by 20%", ' +
-      '"what\'s safe to spend", "my bills", "surprise costs", "compared to people my age", ' +
-      '"my income", "my balance", "biggest purchases", "compare months", "my baskets", ' +
-      '"spending trend", "spending calendar", "my home loan", or a category like "taxi".',
-  );
+  // WHY short: the coach should never ramble, not even the mock. Words the mock knows (for
+  // testing): what kind of spender am I, where does my money slip away, what if I spend 20%
+  // less on restaurants, safe to spend, my bills, surprise costs, compared to people my age,
+  // my income, my balance, biggest purchases, compare months, my baskets, spending trend,
+  // spending calendar, my home loan, or a category like "taxi".
+  return reply("I'm the mock AI, so I only know a few questions. Try a suggested one.");
 }

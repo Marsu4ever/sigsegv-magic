@@ -15,6 +15,7 @@ import type { Insight, InsightKind, InsightsResponse } from "@/lib/types";
 import { MoneyText } from "@/components/chat/MoneyText";
 import { formatValue } from "@/components/charts/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 
 const KIND: Record<InsightKind, { label: string; icon: IconName; tap: string }> = {
   save_help: { label: "Help to save", icon: "piggy", tap: "Tap to see how" },
@@ -118,10 +119,31 @@ export function InsightCards() {
         setInsights((json as InsightsResponse).insights);
       })
       // WHY quiet: insights are extra; the rest of the Account tab still works.
-      .catch((err) => console.error("[insights]", err));
+      .catch((err) => {
+        console.error("[insights]", err);
+        setInsights([]);
+      });
   }, []);
 
-  if (!insights || insights.length === 0) return null;
+  if (!insights) {
+    return (
+      <SkeletonGroup>
+        <Skeleton className="mb-2 ml-1 h-4 w-16" />
+        <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 pb-1">
+          {[0, 1].map((i) => (
+            <div key={i} className="flex w-[78%] shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3.5">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-1.5">
+                <Skeleton className="h-3.5 w-4/5" />
+                <Skeleton className="h-2.5 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </SkeletonGroup>
+    );
+  }
+  if (insights.length === 0) return null;
   return (
     <section>
       <h2 className="mb-2 px-1 text-sm font-semibold">For you</h2>

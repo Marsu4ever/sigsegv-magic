@@ -29,6 +29,7 @@ import { BASKETS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
 import { DevHeaderButton } from "@/components/DevButton";
+import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 
 const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
@@ -91,7 +92,17 @@ export function WeekView() {
 
       <div className="space-y-3 p-4">
         {error && <p className="text-sm text-danger">⚠️ {error}</p>}
-        {!data && !error && <p className="text-sm text-muted">Loading…</p>}
+        {!data && !error && (
+          // Skeleton in the tab's shape: total card, "By day" chart, top categories.
+          <SkeletonGroup className="space-y-3">
+            <SkeletonCard lines={2} />
+            <div className="space-y-3 rounded-xl bg-surface p-4 shadow-sm">
+              <Skeleton className="h-4 w-1/4" />
+              <Skeleton className="h-36 w-full" />
+            </div>
+            <SkeletonCard lines={3} />
+          </SkeletonGroup>
+        )}
 
         {data && (
           <>

@@ -15,6 +15,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { Basket, ChartRow, ChartSpec, DaySpending } from "@/lib/types";
 import { BASKET_LABELS } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
+import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -510,7 +511,13 @@ function HoverPopup({
         <span className="text-sm font-semibold">{dayTitle(hover.date)}</span>
         <span className="text-sm font-semibold tabular-nums">{eur(total)}</span>
       </div>
-      {!day && <p className="px-2 text-xs text-muted">Loading…</p>}
+      {!day && (
+        <SkeletonGroup className="space-y-1.5 px-2 py-1">
+          <Skeleton className="h-2.5 w-full" />
+          <Skeleton className="h-2.5 w-4/5" />
+          <Skeleton className="h-2.5 w-3/5" />
+        </SkeletonGroup>
+      )}
       {day && "error" in day && <p className="px-2 text-xs text-danger">⚠️ {day.error}</p>}
       {day && !("error" in day) && (
         <>
@@ -715,7 +722,14 @@ function DayPanel({
       className="scroll-mt-4 rounded-xl border border-line bg-surface p-3 shadow-sm"
     >
       {day && "error" in day && <p className="text-sm text-danger">⚠️ {day.error}</p>}
-      {!day && <p className="text-sm text-muted">Loading…</p>}
+      {!day && (
+        <SkeletonGroup className="space-y-2">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-4/5" />
+          <Skeleton className="h-3 w-3/5" />
+        </SkeletonGroup>
+      )}
       {day && !("error" in day) && (
         <div>
           <div className="flex items-baseline justify-between">

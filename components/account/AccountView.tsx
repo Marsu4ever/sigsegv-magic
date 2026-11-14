@@ -20,6 +20,7 @@ import { InsightCards } from "@/components/insights/InsightCards";
 import { fiDate, formatValue, weekdayDate } from "@/components/charts/format";
 import { DevHeaderButton } from "@/components/DevButton";
 import { Icon } from "@/components/ui/Icon";
+import { Skeleton, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 
 /** "2026-10-01" → "2026-09-30". WHY local: lib/data is server-only by team rule. */
 function previousDay(iso: string): string {
@@ -93,6 +94,31 @@ function TransactionRow({ t }: { t: AccountTransaction }) {
   );
 }
 
+/** The Account tab's shape while it loads: balance card, in/out tiles, a month of purchases. */
+function AccountSkeleton() {
+  return (
+    <SkeletonGroup className="space-y-4">
+      <div className="space-y-3 rounded-2xl bg-surface p-5 shadow-sm">
+        <Skeleton className="h-3.5 w-1/3" />
+        <Skeleton className="h-9 w-1/2" />
+        <Skeleton className="h-3 w-1/4" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {[0, 1].map((i) => (
+          <div key={i} className="space-y-2 rounded-xl bg-surface p-4 shadow-sm">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-5 w-4/5" />
+          </div>
+        ))}
+      </div>
+      <div className="rounded-xl bg-surface pt-3 shadow-sm">
+        <Skeleton className="mx-auto h-4 w-1/3" />
+        <SkeletonRows rows={6} className="mt-2" />
+      </div>
+    </SkeletonGroup>
+  );
+}
+
 export function AccountView() {
   const [data, setData] = useState<AccountSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +182,7 @@ export function AccountView() {
 
       <div className="space-y-4 p-4">
         {error && <p className="text-sm text-danger">⚠️ {error}</p>}
-        {!data && !error && <p className="text-sm text-muted">Loading…</p>}
+        {!data && !error && <AccountSkeleton />}
 
         {data && list && (
           <>

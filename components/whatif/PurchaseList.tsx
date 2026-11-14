@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import type { SpendingTarget, TargetPurchase } from "@/lib/types";
 import { formatValue, shortLabel, weekday, weekdayDate } from "@/components/charts/format";
+import { SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 
 export function PurchaseList({
   target,
@@ -112,7 +113,9 @@ export function PurchaseList({
         {error ? (
           <p className="text-sm text-danger">⚠️ {error}</p>
         ) : !items ? (
-          <p className="pt-6 text-center text-sm text-muted">Loading…</p>
+          <SkeletonGroup>
+            <SkeletonRows rows={6} />
+          </SkeletonGroup>
         ) : items.length === 0 ? (
           <p className="pt-6 text-center text-sm text-muted">No purchases yet by this day.</p>
         ) : (
