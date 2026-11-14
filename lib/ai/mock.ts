@@ -55,26 +55,26 @@ function whatIfText(w: WhatIf): string {
     return "You have less than a month of spending history — not enough data yet to make a prediction.";
   }
   if (w.emptyReason === "no_spending") {
-    if (w.monthsWithData.length === 0) {
-      return `I couldn't find any spending on ${what} in your history, so there's not enough data yet to predict it.`;
-    }
-    const last = w.months === 1 ? "last month" : `in the last ${P[w.months]}`;
-    return (
-      `You didn't spend on ${what} ${last}, so there's not enough data yet for a ${w.months}-month prediction. ` +
-      `Switch to ${P[w.monthsWithData[0]]} to see one.`
-    );
+    // WHY no "switch to 3 months": every period uses the same 12-month average (DECISIONS.md #25).
+    return `I couldn't find any spending on ${what} in the last 12 months, so there's not enough data yet to predict it.`;
   }
   // WHY every option: the user can then compare 5 / 10 / 20 % without tapping each circle.
   const lines = w.cutOptions.map((o) => `• ${o.cutPct}% less → save about ${plus(o.savingEur)}`);
   const save = `If you spent less, you'd save:\n${lines.join("\n")}`;
-  if (w.status === "fallback" && w.basedOnMonths) {
-    return (
-      `If you keep spending on ${what} at the same pace, you'd spend about ${minus(w.noChangeEur)} ${next} ` +
-      `(based on your last ${P[w.basedOnMonths]} — there isn't ${P[w.months]} of history yet). ${save}`
-    );
-  }
-  const last = w.months === 1 ? "last month" : `over the last ${P[w.months]}`;
-  return `If you keep spending on ${what} like you did ${last}, you'd spend about ${minus(w.noChangeEur)} ${next}. ${save}`;
+  const a = w.average;
+  if (!a) return `You'd spend about ${minus(w.noChangeEur)} on ${what} ${next}. ${save}`;
+  // WHY name the average: the estimate is the user's typical month, not last month (DECISIONS.md #34).
+  // Short history (incl. status "fallback") → "your 2 months of history" says it all.
+  // WHY floor: 5.9 months must not read as "6 months" next to "not enough for 6 months".
+  // Same wording as averageBasisText() in components/charts/format.ts (lib must not import components).
+  const n = Math.max(1, Math.floor(a.months));
+  const basis = a.months >= 12 ? "the last 12 months" : `your ${n} month${n === 1 ? "" : "s"} of history`;
+  const estimate =
+    w.months === 1 ? "so that's the estimate for next month" : `so about ${minus(w.noChangeEur)} ${next}`;
+  // WHY: with nothing spent in the shown period, the user must know where the number comes from.
+  const shown = w.basedOnMonths === 1 ? "last month" : `in the last ${P[w.basedOnMonths ?? w.months]}`;
+  const none = w.pastEur === 0 ? `You didn't spend on ${what} ${shown}. ` : "";
+  return `${none}In a typical month you spend about ${minus(a.perMonthEur)} on ${what} (average of ${basis}), ${estimate}. ${save}`;
 }
 
 export function mockReply(history: ChatMessage[]): ChatMessage {
