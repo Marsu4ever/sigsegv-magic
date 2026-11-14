@@ -53,7 +53,7 @@ function whatIfText(w: WhatIf): string {
   const P = FORECAST_PERIOD_TEXT;
   const next = w.months === 1 ? "next month" : `in the next ${P[w.months]}`;
   if (w.emptyReason === "short_history") {
-    return "You have less than a month of spending history — not enough data yet to make a prediction.";
+    return "You have less than a month of spending history, not enough data yet to make a prediction.";
   }
   if (w.emptyReason === "no_spending") {
     // WHY no "switch to 3 months": every period uses the same 12-month average (DECISIONS.md #25).
@@ -156,7 +156,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const m = data("month_progress");
     const diff = m.differenceVsLastMonthSoFarEur;
     return reply(
-      `So far this month you've spent ${minus(m.spentSoFarEur)} — ${diff >= 0 ? minus(diff) : plus(-diff)} ${diff >= 0 ? "more" : "less"} ` +
+      `So far this month you've spent ${minus(m.spentSoFarEur)}, ${diff >= 0 ? minus(diff) : plus(-diff)} ${diff >= 0 ? "more" : "less"} ` +
         `than by the same day last month. At this pace the month ends around ${minus(m.projectedMonthTotalEur)} ` +
         `(last month: ${minus(m.lastMonthTotalEur)}).`,
       chart("cumulative", "This month so far", "month_progress"),
@@ -165,7 +165,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
 
   if (has(q, "heatmap", "calendar", "heat map", "which days", "activity")) {
     return reply(
-      "Here's your spending calendar — darker days = more spending. Tap it to switch months and see what you bought on any day.",
+      "Here's your spending calendar. Darker days = more spending. Tap it to switch months and see what you bought on any day.",
       chart("heatmap", category ? `${category} calendar` : "Spending calendar", "spend_over_time", {
         period: "all",
         ...(category ? { category } : {}),
@@ -199,7 +199,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     };
     const w = data("what_if", args);
     return reply(
-      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month — ${plus(w.savingPerYearEur)} a year.`,
+      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month, ${plus(w.savingPerYearEur)} a year.`,
       chart("bar", `${w.what}: now vs after −${pct}%`, "what_if", args),
     );
   }
@@ -208,7 +208,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const l = data("everyday_leaks", { period: "last_90_days" });
     return reply(
       `Small purchases (≤ €${l.smallPurchases.maxEur}) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
-        `${minus(l.smallPurchases.perMonthEur)} a month — ${minus(l.smallPurchases.perYearEur)} a year.`,
+        `${minus(l.smallPurchases.perMonthEur)} a month, ${minus(l.smallPurchases.perYearEur)} a year.`,
       chart("leaks", "Where my money slips away 💸", "everyday_leaks", { period: "last_90_days" }),
     );
   }
