@@ -11,6 +11,7 @@
  * localStorage later if needed.
  */
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useGoal } from "@/components/goal/api";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
@@ -50,6 +51,7 @@ function suggestionIcon(text: string): IconName {
   if (q.includes("basket")) return "basket";
   if (q.includes("calendar")) return "calendar";
   if (q.includes("this month")) return "trend";
+  if (q.includes("goal") || q.includes("save for")) return "piggy";
   return "sparkles";
 }
 
@@ -93,6 +95,7 @@ export function ChatView() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
   // The lightbulb next to the text box: suggested questions again, mid-conversation.
+  const goal = useGoal();
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   // WHY: someone who keeps little of their income may not know it. The coach says so
   // first, before they ask (lib/insights/proactive.ts, "save_help").
@@ -127,9 +130,12 @@ export function ChatView() {
     Promise.allSettled([insights, chip]).then(() => setStartReady(true));
   }, []);
 
-  const suggestions = whatIfChip
+  // Saving goal chip (lib/goals): start one, or ask how it's going. Added once the goal has loaded.
+  const goalChip = goal.view ? (goal.view.goal ? "How is my goal going?" : "Help me save for something") : null;
+  const base = whatIfChip
     ? [...SUGGESTIONS.slice(0, WHAT_IF_CHIP_AT), whatIfChip, ...SUGGESTIONS.slice(WHAT_IF_CHIP_AT)]
     : SUGGESTIONS;
+  const suggestions = goalChip ? [...base.slice(0, 1), goalChip, ...base.slice(1)] : base;
 
   // WHY leave out what was already asked: the lightbulb should offer what the user
   // hasn't explored yet. If they've asked everything, show the full list again.

@@ -15,7 +15,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { versionLabel } from "@/lib/version";
 import { Icon } from "@/components/ui/Icon";
 
-const SHOW_CUSTOMER_SWITCHER = true;
+// WHY exported: the goal card's demo controls (components/goal/GoalSection.tsx) hide with it.
+export const SHOW_CUSTOMER_SWITCHER = true;
 
 const eur = (n: number) => `${n.toLocaleString("fi-FI")} €`;
 const reason = (r: string | null) => (r ?? "").replace(/_/g, " ");

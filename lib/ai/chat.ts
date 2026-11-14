@@ -9,7 +9,7 @@
  * DEBUGGING: every step logs a line starting with [ai] to the terminal
  * running `npm run dev`. If the chat hangs or fails, look there first.
  */
-import type { ChartSpec, ChatMessage, WhatIf } from "@/lib/types";
+import type { ChartSpec, ChatMessage, GoalDraft, WhatIf } from "@/lib/types";
 import {
   allMerchantTypes,
   getCustomer,
@@ -23,9 +23,11 @@ import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, runTool } from "./tools";
 import { mockReply } from "./mock";
+import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
 import { moneyHealthNote } from "@/lib/insights/proactive";
+import { getGoalState } from "@/lib/goals/state";
 import { dropSentencesWith, euroAmounts, numbersIn, unsupportedAmounts } from "./amounts";
 
 const MAX_TOOL_ROUNDS = 6;
@@ -86,6 +88,23 @@ function fallbackCharts(history: ChatMessage[]): ChartSpec[] {
 }
 
 /**
+ * Goal safety net. WHY: Qwen sometimes answered "save 1000 for a trip by June" with its own
+ * arithmetic and no plan_goal call; the app check then got an empty reply. The mock parses the
+ * sentence and calls the real plan_goal tool, so the card's numbers are exact.
+ */
+function fallbackGoal(history: ChatMessage[]): { goalDraft: GoalDraft; text: string } | null {
+  try {
+    const r = mockReply(history);
+    if (!r.goalDraft) return null;
+    console.log(`[ai] model made no goal draft — added "${r.goalDraft.name}" (keyword fallback)`);
+    return { goalDraft: r.goalDraft, text: r.text.replace(/^\[mock AI\]\s*/, "") };
+  } catch (err) {
+    console.warn("[ai] goal fallback failed:", err);
+    return null;
+  }
+}
+
+/**
  * One line telling the model what the user already sees under an earlier reply.
  * WHY: we send old replies as text only (charts would cost tokens), so the model didn't know
  * the leaks chart was already on screen and drew it again for every follow-up about a habit.
@@ -94,6 +113,7 @@ function onScreen(m: ChatMessage): string {
   const shown = [
     ...(m.charts ?? []).map((c) => `${c.type} chart "${c.title}"`),
     ...(m.whatIf ? [`what-if view: ${m.whatIf.target.label}, ${m.whatIf.cutPct}% less`] : []),
+    ...(m.goalDraft ? [`goal card "${m.goalDraft.name}" with a Save button`] : []),
   ];
   return shown.length ? `\n[On screen: ${shown.join("; ")}]` : "";
 }
@@ -132,6 +152,8 @@ export async function runChat(history: ChatMessage[]): Promise<{
         whatIfDefault: getDefaultTarget().label,
         // WHY: lets the coach help someone save before they ask (lib/insights/proactive.ts).
         moneyNote: moneyHealthNote(),
+        // WHY only the name: numbers in the prompt aren't tool results (amounts.ts would flag them).
+        goalName: getGoalState().goal?.name ?? null,
       }),
     },
     // WHY only text from history: earlier charts are already on screen; re-sending their
@@ -153,6 +175,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
   // the same made-up €89.64 again (14.94 × 6 from its own earlier text).
   let forceTool = false;
   let whatIf: WhatIf | undefined; // the last what_if_spending result opens the what-if view
+  let goalDraft: GoalDraft | undefined; // the last plan_goal result → "Save goal" card
 
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     console.log(`[ai] round ${round}: asking LLM…`);
@@ -235,6 +258,18 @@ export async function runChat(history: ChatMessage[]): Promise<{
         `[ai] round ${round}: final answer in ${ms(start)} (${(msg.content ?? "").length} chars)`,
       );
       if (!msg.content) console.warn("[ai] warning: final answer is empty");
+      // Goal safety net (same idea as fallbackCharts): a "save X for Y" question answered
+      // without plan_goal still gets the Save card from the mock's parse (real tool, real numbers).
+      if (!goalDraft) {
+        const g = fallbackGoal(history);
+        if (g) {
+          goalDraft = g.goalDraft;
+          if (!text.trim()) text = g.text;
+        }
+      }
+      // WHY a fixed offer with a goal card: the model kept offering "Save for my trip", which
+      // duplicates the card's Save button. The habits behind the missions are the next step.
+      if (goalDraft) text = `${splitFollowUp(text).body.trim()}\n[[Where does my money slip away?]]`;
       return {
         reply: {
           role: "assistant",
@@ -243,8 +278,10 @@ export async function runChat(history: ChatMessage[]): Promise<{
           text: euroAfter(noLongDashes(text)),
           // No chart from the model → safety net adds one, unless the what-if
           // view opens (that panel already is the visual).
-          charts: charts.length > 0 || whatIf ? charts : fallbackCharts(history),
+          // WHY no safety-net chart with a goal card: the card is the visual for that answer.
+          charts: charts.length > 0 || whatIf || goalDraft ? charts : fallbackCharts(history),
           whatIf,
+          goalDraft,
         },
         mode: "live",
       };
@@ -295,6 +332,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
         }
       }
       if ("whatIf" in result && result.whatIf) whatIf = result.whatIf;
+      if ("goalDraft" in result && result.goalDraft) goalDraft = result.goalDraft;
       knownNumbers.push(...numbersIn(result.content));
       messages.push({ role: "tool", tool_call_id: call.id, content: result.content });
     }
@@ -307,6 +345,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
       text: "Sorry, I got stuck working that out. Could you ask in a different way?",
       charts,
       whatIf,
+      goalDraft,
     },
     mode: "live",
   };

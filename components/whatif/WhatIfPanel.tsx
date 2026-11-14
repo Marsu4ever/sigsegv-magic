@@ -13,6 +13,7 @@
  * Tapping the chart swaps it for the purchases up to that day (PurchaseList, from
  * GET /api/what-if/purchases); the round ← button brings the chart back with the same point open.
  */
+import Link from "next/link";
 import { useRef, useState } from "react";
 import type { ForecastMonths, SpendingTarget, WhatIf } from "@/lib/types";
 import { FORECAST_LABELS, FORECAST_MONTHS, FORECAST_PERIOD_TEXT, cutOptionsWith } from "@/lib/types";
@@ -26,6 +27,7 @@ import { Icon } from "@/components/ui/Icon";
 import { EstimateInfo } from "@/components/whatif/EstimateInfo";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { averageBasisText, formatValue } from "@/components/charts/format";
+import { daysText } from "@/components/goal/api";
 
 const CHART_HEIGHT = 280; // WHY taller: no headline above the chart any more
 
@@ -265,6 +267,13 @@ export function WhatIfPanel({
               <path d="m6 9 6 6 6-6" />
             </svg>
           </button>
+          {/* Saving goal set: the saving in days of the goal's weekly plan (lib/goals). */}
+          {shown.goalImpact && (
+            <Link href="/week#goal" className="mt-0.5 block text-sm font-medium text-accent">
+              {daysText(shown.goalImpact.daysCloser)} closer to {shown.goalImpact.goalName}{" "}
+              {shown.goalImpact.emoji}
+            </Link>
+          )}
           {/* WHY grid rows 0fr → 1fr: the totals slide open instead of popping in. */}
           <div
             className={`grid transition-[grid-template-rows,opacity] duration-300 motion-reduce:transition-none ${

@@ -283,6 +283,7 @@ export type ChatMessage = {
   text: string;
   charts?: ChartSpec[]; // only on assistant messages
   whatIf?: WhatIf; // only on assistant messages; opens the what-if view
+  goalDraft?: GoalDraft; // only on assistant messages; "Save goal" card (added for saving goals, additive)
 };
 
 /** POST /api/chat request body. Send the whole conversation so far. */
@@ -552,4 +553,106 @@ export type WhatIf = {
   lastYear: LastYearSpending | null; // same window a year ago; null = not fully in the history
   breakdown: ChartRow[]; // what the target is made of (sub-categories / merchant types), biggest first
   topCategories: CategoryOption[]; // next 2 biggest everyday-basket groups in the lookback (target left out)
+  /** How much closer the saving gets the user's savings goal (only when a goal is set). Additive. */
+  goalImpact?: GoalImpact;
 };
+
+// ─── Saving goal + weekly missions ───────────────────────────────────────
+// Added (new types only, DECISIONS.md #53). Built by lib/goals/; GET/POST /api/goal.
+// The goal only moves when the user moves money to it; missions are built by code
+// from the user's own habits (never by the AI).
+
+/** A savings goal: "Lisbon, 1 000 € by 30.6.2027". */
+export type SavingsGoal = {
+  name: string;
+  emoji: string;
+  targetEur: number;
+  startEur: number; // already set aside when the goal was made (entered by the user)
+  byDate: string; // "YYYY-MM-DD"
+  createdOn: string; // the app's "today" when it was made
+  weeklyPlanEur: number; // the weekly amount needed when it was made (the plan line)
+};
+
+/** A goal before it is saved: what the user (or the coach) typed, checked and worked out. */
+export type GoalDraft = {
+  name: string;
+  emoji: string;
+  targetEur: number;
+  startEur: number;
+  byDate: string;
+  weeksLeft: number;
+  weeklyNeededEur: number;
+  /** What the user usually keeps a week (income − spending, last 3 full months). null = no income data. */
+  typicalKeptPerWeekEur: number | null;
+  /** The weekly amount is more than half of what they usually keep. */
+  stretch: boolean;
+  /** A later date where the weekly amount fits in half of what they keep (only when stretch). */
+  suggestedDate: string | null;
+  /** Set when the input can't make a goal (e.g. a date in the past). Nothing else is reliable then. */
+  error?: string;
+};
+
+/** One weekly mission: spend at most capEur on a habit this week. */
+export type Mission = {
+  id: string; // "habit:Restaurant" or "everyday"
+  habit: string; // habit name as on the leaks cards ("Restaurant"), or "Everyday spending"
+  category: string; // for the icon
+  title: string; // "Restaurant under 35 € this week"
+  baselineEur: number; // usual week (last 90 days)
+  capEur: number;
+  keepsEur: number; // baselineEur − capEur
+  daysCloser: number | null; // keepsEur in days of the goal's weekly plan (null = no goal)
+  dayHint: string | null; // "Fridays are your big Restaurant day"
+  typicalPurchaseEur: number; // average purchase (demo buttons)
+};
+
+export type MissionPurchase = { date: string; eur: number };
+
+export type MissionStatus = "on_track" | "close" | "over";
+
+/** How a finished week went. */
+export type WeekResult = {
+  n: number;
+  habit: string;
+  won: boolean;
+  spentEur: number;
+  capEur: number;
+  baselineEur: number;
+  keptEur: number; // max(0, usual − spent): spent less than usual (not saved until moved)
+  movedEur: number | null; // put toward the goal; null = not decided yet
+};
+
+/** GET/POST /api/goal response body. */
+export type GoalView = {
+  asOf: string; // the last day in the data
+  goal:
+    | (SavingsGoal & {
+        savedEur: number;
+        pct: number; // 0–100
+        remainingEur: number;
+        weeksLeft: number;
+        weeklyNeededEur: number; // from now on
+        daysAhead: number; // ahead of the plan line, in days (0 = on plan or behind; never negative)
+        reached: boolean;
+      })
+    | null;
+  level: number; // 1 + weeks won (never goes down)
+  weeksWon: number;
+  week: { n: number; range: DateRange; day: number; today: string };
+  mission:
+    | (Mission & {
+        spentEur: number;
+        leftEur: number;
+        daysLeft: number;
+        status: MissionStatus;
+        purchases: MissionPurchase[];
+      })
+    | null;
+  candidates: Mission[]; // only when a goal exists, no mission and no result this week
+  skippedForJoy: string[]; // habits left out because the user said they spark joy
+  result: WeekResult | null; // the week that just ended (until "next week")
+  joy: string[];
+};
+
+/** WhatIf.goalImpact: the what-if saving in days of the goal's weekly plan. */
+export type GoalImpact = { goalName: string; emoji: string; daysCloser: number };

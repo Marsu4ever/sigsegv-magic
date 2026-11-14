@@ -370,3 +370,31 @@ body {
     display: none;
   }
 }
+
+/* Saving goal (components/goal/): a won week gets a small burst of dots around the result
+   badge. Short (< 1 s) and once; off with reduced motion. */
+@keyframes goal-burst {
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(1);
+    opacity: 0;
+  }
+}
+.goal-burst {
+  animation: goal-burst 0.9s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+/* The goal bar grows smoothly when money is moved to it. */
+.goal-fill {
+  transition: width 0.9s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .goal-burst {
+    display: none;
+  }
+  .goal-fill {
+    transition: none;
+  }
+}

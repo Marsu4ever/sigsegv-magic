@@ -5,6 +5,7 @@ import { MoneyText } from "./MoneyText";
 import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
+import { GoalDraftCard } from "@/components/goal/GoalDraftCard";
 
 // WHY no "show chart" link on what-if replies: ChatView draws the what-if panel right above
 // the reply that opened it.
@@ -39,6 +40,8 @@ export function MessageBubble({
         {message.charts?.map((c, i) => (
           <ChartCard key={i} spec={c} />
         ))}
+        {/* Saving goal the coach worked out → the user saves it (lib/goals, DECISIONS.md #50). */}
+        {message.goalDraft && <GoalDraftCard draft={message.goalDraft} />}
         {followUp && onFollowUp && (
           <button
             type="button"

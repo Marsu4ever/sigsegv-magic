@@ -80,6 +80,16 @@ function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => v
       >
         <Icon name="chat" size={18} /> Ask the coach about this
       </Link>
+      {/* WHY only for "help to save": a goal turns "you keep little" into something to do
+          this week (DECISIONS.md #53c). */}
+      {insight.kind === "save_help" && (
+        <Link
+          href="/week?setup=1"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-line py-3 text-sm font-semibold"
+        >
+          🎯 Set a savings goal
+        </Link>
+      )}
     </BottomSheet>
   );
 }

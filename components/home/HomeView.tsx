@@ -8,6 +8,7 @@
  *   1. account overview      → /api/account   (balance, change since last month, income /
  *                                              expenses / net; details in a sheet)
  *   2. safe to spend         → /api/home      (= the coach's safe_to_spend tool)
+ *   (saving goal strip       → /api/goal      only when a goal is set; GoalStrip, see DECISIONS #53c)
  *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
  *   4. spending breakdown    → /api/week      (the "Last 7 days" hero + podium; details on /week)
  *   5. upcoming payments     → /api/home      (recurring bills / savings, next month)
@@ -21,6 +22,7 @@ import type { AccountSummary, Basket, HomeExtrasResponse, WeekSummary } from "@/
 import { AccountOverview } from "./AccountOverview";
 import { TransactionDayList } from "@/components/account/TransactionList";
 import { InsightCards } from "@/components/insights/InsightCards";
+import { GoalStrip } from "@/components/goal/GoalStrip";
 import { Hero, TopCategories } from "@/components/week/WeekView";
 import { SafeToSpendCard } from "./SafeToSpendCard";
 import { UpcomingPayments } from "./UpcomingPayments";
@@ -130,6 +132,9 @@ export function HomeView() {
             <SkeletonCard lines={3} />
           </SkeletonGroup>
         )}
+
+        {/* Saving goal: one line, only when a goal is set; taps through to /week (DECISIONS.md #53c) */}
+        <GoalStrip />
 
         {/* 3. Coach insights (hides itself when there's nothing to say) */}
         <InsightCards title="Coach insights" />

@@ -47,6 +47,7 @@ import {
   spentEur,
 } from "@/lib/data";
 import { everydayGroups, FALLBACK_TARGET, matchesTarget, targetKey } from "./targets";
+import { goalImpact } from "@/lib/goals/view";
 
 export const DEFAULT_CUT_PCT = CUT_OPTIONS[0]; // 5 %
 const TOP_CATEGORIES = 2; // WHY 2: fewer buttons keep the phone view calm
@@ -345,7 +346,10 @@ export function getWhatIf(
   months: ForecastMonths,
   cutPct = DEFAULT_CUT_PCT,
 ): WhatIf {
-  return buildWhatIf(getTransactions(), getDataToday(), getDataFirstDay(), target, months, cutPct);
+  const w = buildWhatIf(getTransactions(), getDataToday(), getDataFirstDay(), target, months, cutPct);
+  // Saving goal set → "≈ N days closer to Lisbon" under "You'd save" (DECISIONS.md #53c).
+  const impact = w.savingEur > 0 ? goalImpact(w.savingEur) : undefined;
+  return impact ? { ...w, goalImpact: impact } : w;
 }
 
 /**

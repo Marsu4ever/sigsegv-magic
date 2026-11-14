@@ -3,6 +3,9 @@
  * "This week" tab — simple overview, no AI. Owner: UI person.
  * Data comes from GET /api/week (lib/data/index.ts → getWeekSummary).
  *
+ * TOP: the saving goal + this week's mission (components/goal/GoalSection.tsx, DECISIONS.md #53).
+ * WHY here: a mission is a weekly thing, and this tab is where you look at your week.
+ *
  * NOTE: shows the LAST 7 DAYS in the dataset (ending on its latest day), not the
  * real calendar week — the data is synthetic and ends mid-week. See getWeekSummary().
  *
@@ -32,6 +35,7 @@ import Link from "next/link";
 import { DevHeaderButton } from "@/components/DevButton";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
+import { GoalSection } from "@/components/goal/GoalSection";
 
 const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
@@ -78,27 +82,32 @@ export function WeekView() {
 
   return (
     <div className="h-full overflow-y-auto" onClick={focus ? clearOnOutsideTap : undefined}>
-      {/* Title on the left, dates on the right, same size (team call: far apart).
-          On phones the 🛠 team-hub link sits after the dates (components/DevButton.tsx). */}
+      {/* WHY "This week": the page holds your saving goal and mission too (DECISIONS.md #53); the
+          7-day numbers below get their own label with the dates. On phones the 🛠 team-hub link
+          sits here (components/DevButton.tsx). */}
       <header className="flex items-center justify-between gap-4 border-b border-line bg-surface px-4 py-3">
         {/* WHY a back arrow: this page is now opened from Home's spending breakdown (no own tab). */}
         <h1 className="flex items-center gap-1 font-semibold">
           <Link href="/home" aria-label="Back to Home" className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-muted">
             <Icon name="chevron" size={20} className="rotate-180" />
           </Link>
-          Last 7 days
+          This week
         </h1>
-        <div className="flex items-center gap-2">
-          {data && (
-            <span className="text-muted tabular-nums">
-              {fiDate(data.range.from)} – {fiDate(data.range.to)}
-            </span>
-          )}
-          <DevHeaderButton />
-        </div>
+        <DevHeaderButton />
       </header>
 
       <div className="space-y-3 p-4">
+        <GoalSection />
+
+        {/* Title on the left, dates on the right (team call: far apart). */}
+        <div className="flex items-baseline justify-between gap-4 px-1 pt-3">
+          <h2 className="font-semibold">Last 7 days</h2>
+          {data && (
+            <span className="text-sm text-muted tabular-nums">
+              {fiDate(data.range.from)} – {fiDate(data.range.to)}
+            </span>
+          )}
+        </div>
         {error && <p className="text-sm text-danger">⚠️ {error}</p>}
         {!data && !error && (
           // Skeleton in the tab's shape: total card, "By day" chart, top categories.
