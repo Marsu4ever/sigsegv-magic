@@ -58,7 +58,16 @@ const COLORS: Record<LineKey, string> = {
 // so they differ in both pattern and color.
 // "0.1 5" + round caps draws round dots.
 const DOTTED = "0.1 5";
-const DASHED = "7 4";
+// WHY "5 7" (was "7 4"): round caps add half the line width to each end, so the dashes become
+// soft pills of about the same length and gap as before.
+const DASHED = "5 7";
+// WHY "basis" (B-spline) curves: soft, rounded steps instead of sharp corners at every purchase.
+// "monotone" passes through every point, so a jump between two days stays almost square.
+// A B-spline never dips below a step (a running total must not look like it goes down) and
+// starts / ends exactly on its first and last point, so the lines still meet at today.
+// Trade-off: at a sharp step the curve passes a little inside the point; the tooltip shows
+// the exact €.
+const CURVE = "basis";
 const DRAW_MS = 1200; // past line (same feel as "Month so far")
 const PROJECT_MS = 700; // projected lines, after the past line
 
@@ -116,7 +125,8 @@ export function ProjectionChart({
             // WHY: no focus box on click (see app/globals.css).
             accessibilityLayer={false}
             data={points}
-            margin={{ top: 16, right: 8, bottom: 0, left: 0 }}
+            // WHY top 22: room for the bigger "Today" label above the plot.
+            margin={{ top: 22, right: 8, bottom: 0, left: 0 }}
             onClick={(s) => {
               // WHY by date: Recharts 3 gives the label (our dataKey), the index as a string.
               const i = points.findIndex((p) => p.date === String(s?.activeLabel));
@@ -155,14 +165,23 @@ export function ProjectionChart({
               x={today}
               stroke="var(--muted)"
               strokeDasharray="2 3"
-              label={{ value: "Today", fontSize: 10, fill: "var(--muted)", position: "top" }}
+              label={{
+                value: "Today",
+                fontSize: 13,
+                fontWeight: 600,
+                fill: "var(--muted)",
+                position: "top",
+              }}
             />
             {/* WHY no connectNulls: null = "this line has no value here", so it starts/ends at today. */}
             <Line
+              type={CURVE}
               dataKey="actual"
               name={labels.actual}
               stroke={COLORS.actual}
               strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               dot={false}
               activeDot={ACTIVE_DOT}
               isAnimationActive={animate}
@@ -171,11 +190,13 @@ export function ProjectionChart({
               onAnimationEnd={() => setIntroDone(true)}
             />
             <Line
+              type={CURVE}
               dataKey="noChange"
               name={labels.noChange}
               stroke={COLORS.noChange}
               strokeDasharray={DOTTED}
               strokeLinecap="round"
+              strokeLinejoin="round"
               strokeWidth={3}
               dot={false}
               activeDot={ACTIVE_DOT}
@@ -185,10 +206,13 @@ export function ProjectionChart({
               animationEasing="ease-out"
             />
             <Line
+              type={CURVE}
               dataKey="withCut"
               name={labels.withCut}
               stroke={COLORS.withCut}
               strokeDasharray={DASHED}
+              strokeLinecap="round"
+              strokeLinejoin="round"
               strokeWidth={2.5}
               dot={false}
               activeDot={ACTIVE_DOT}

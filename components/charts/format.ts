@@ -27,6 +27,17 @@ export function fiDate(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
+/**
+ * What a what-if average (WhatIf.average.months) covers: 12 → "the last 12 months",
+ * 5.9 → "your 5 months of history".
+ * WHY floor: 5.9 months must not read as "6 months" next to "not enough for 6 months yet".
+ */
+export function averageBasisText(months: number): string {
+  if (months >= 12) return "the last 12 months";
+  const n = Math.max(1, Math.floor(months));
+  return `your ${n} month${n === 1 ? "" : "s"} of history`;
+}
+
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** "2026-11-03" → "Tue" (English short weekday). */

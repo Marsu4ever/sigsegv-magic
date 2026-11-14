@@ -21,7 +21,9 @@ import { CountUp } from "@/components/ui/CountUp";
 import { EmptyChart } from "@/components/charts/EmptyChart";
 import { ProjectionChart } from "@/components/charts/ProjectionChart";
 import { PurchaseList } from "@/components/whatif/PurchaseList";
-import { formatValue } from "@/components/charts/format";
+import { EstimateInfo } from "@/components/whatif/EstimateInfo";
+import { InfoTip } from "@/components/ui/InfoTip";
+import { averageBasisText, formatValue } from "@/components/charts/format";
 
 const CHART_HEIGHT = 280; // WHY taller: no headline above the chart any more
 
@@ -79,13 +81,15 @@ export function WhatIfPanel({
    * but a note in the panel cluttered the view.
    */
   function announceFallback(w: WhatIf) {
-    if (w.status !== "fallback" || !w.basedOnMonths) return;
+    if (w.status !== "fallback" || !w.average) return;
     const k = `${targetKey(w.target)}|${w.months}`;
     if (noticed.current.has(k)) return;
     noticed.current.add(k);
+    // WHY average.months: the estimate is the average of ALL the history (DECISIONS.md #34),
+    // not only the shorter period the chart shows.
     onNotice?.(
-      `Estimate based on your last ${FORECAST_PERIOD_TEXT[w.basedOnMonths]} — ` +
-        `not enough history for ${FORECAST_PERIOD_TEXT[w.months]} yet.`,
+      `Estimate based on ${averageBasisText(w.average.months)} — ` +
+        `not enough for ${FORECAST_PERIOD_TEXT[w.months]} yet.`,
     );
   }
 
@@ -132,8 +136,15 @@ export function WhatIfPanel({
 
   return (
     <section className="space-y-3 rounded-xl bg-surface p-3 shadow-sm" aria-label="What-if">
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="pt-1 font-semibold leading-snug">What if I spent less on {what}?</h2>
+      {/* WHY relative: the ⓘ box opens below this row, as wide as the card (see InfoTip). */}
+      <div className="relative flex items-start justify-between gap-2">
+        {/* WHY an inline h2: the ⓘ then follows the question mark, even when the heading wraps. */}
+        <div className="pt-1 font-semibold leading-snug">
+          <h2 className="inline">What if I spent less on {what}?</h2>
+          <InfoTip label="How is this estimated?">
+            <EstimateInfo w={shown} />
+          </InfoTip>
+        </div>
         <button
           type="button"
           onClick={onClose}

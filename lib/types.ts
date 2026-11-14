@@ -384,24 +384,42 @@ export type TargetPurchase = {
   amountEur: number; // positive = spent
 };
 
+/**
+ * What the what-if estimate is based on: the target's average month over the last 12 months,
+ * or over all the history when it is shorter (DECISIONS.md #34). Added 14 Nov (new type, additive).
+ */
+export type MonthlyAverage = {
+  range: DateRange; // the last 12 months, or from the customer's first day of data
+  months: number; // length of range in months, 1 decimal (12 = a full year)
+  perMonthEur: number; // spent on the target in an average month
+};
+
+/**
+ * The target's spending in the forecast window one year earlier. A fact for the coach
+ * ("last December you spent…"), NOT part of the estimate (DECISIONS.md #34). Added 14 Nov (additive).
+ */
+export type LastYearSpending = { range: DateRange; spentEur: number };
+
 /** GET /api/what-if response body, and ChatMessage.whatIf. Built by lib/insights/whatIfForecast.ts. */
 export type WhatIf = {
   target: SpendingTarget;
   cutPct: number; // the selected one of CUT_OPTIONS, e.g. 5
   months: ForecastMonths; // the period shown (always the one asked for)
-  monthsWithData: ForecastMonths[]; // which toggle options have spending on the target ([] = none → 🙂 everywhere)
-  basedOnMonths: ForecastMonths | null; // history actually used (null = not enough data)
+  monthsWithData: ForecastMonths[]; // which toggle options show an estimate (spending on the target in the last 12 months; [] = none → 🙂 everywhere)
+  basedOnMonths: ForecastMonths | null; // the chart's past period = lookback (null = not enough data); the estimate uses `average`
   status: ForecastStatus;
-  emptyReason: "short_history" | "no_spending" | null;
+  emptyReason: "short_history" | "no_spending" | null; // no_spending = none in the last 12 months (or the shorter history)
   today: string;
   lookback: DateRange | null;
   horizon: DateRange;
-  pastEur: number; // spent on the target in the lookback
-  noChangeEur: number; // next period, unchanged
+  pastEur: number; // spent on the target in the lookback (the chart's past line; may be 0 when average > 0)
+  noChangeEur: number; // next period, unchanged = average.perMonthEur × months
   withCutEur: number; // next period, with the cut
   savingEur: number; // noChangeEur − withCutEur
   cutOptions: CutSaving[]; // the same totals for every CUT_OPTIONS % (for the chat message); [] = no data
   points: ProjectionPoint[];
+  average: MonthlyAverage | null; // what noChangeEur is based on (null = not enough data)
+  lastYear: LastYearSpending | null; // same window a year ago; null = not fully in the history
   breakdown: ChartRow[]; // what the target is made of (sub-categories / merchant types), biggest first
   topCategories: CategoryOption[]; // next 2 biggest everyday-basket groups in the lookback (target left out)
 };

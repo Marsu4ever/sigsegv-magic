@@ -395,8 +395,9 @@ const TOOLS: Tool[] = [
     // stays as a sub-tool (per-month / per-year saving) for a later section of that view.
     name: "what_if_spending",
     description:
-      "Main tool for 'what if I spent less on X?'. Predicts the next 1, 3 or 6 months from the same-length past " +
-      "period (unchanged vs with a cut) and opens a what-if chart for the user. category: e.g. 'restaurants', " +
+      "Main tool for 'what if I spent less on X?'. Predicts the next 1, 3 or 6 months as the user's average month " +
+      "on X (last 12 months, or all history if shorter; see average) × months, unchanged vs with a cut, and opens " +
+      "a what-if chart of the last 1, 3 or 6 months for the user. lastYear = same months a year ago (info only). category: e.g. 'restaurants', " +
       "'eating out' (= restaurants + cafes + takeaway), 'groceries', 'taxi'. only: optional list of exact " +
       "categories or merchant types to narrow it, e.g. ['Cafes'] or ['Fast food'] (the result's breakdown shows " +
       "what is inside). cut_pct: 5, 10 or 20, default 5 — the % the view opens on; the result's cutOptions " +
