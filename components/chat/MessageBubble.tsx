@@ -6,8 +6,8 @@ import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
 
-// WHY no "show chart" link on what-if replies: the what-if panel stays above the chat,
-// so the user can just scroll up to it.
+// WHY no "show chart" link on what-if replies: ChatView draws the what-if panel right above
+// the reply that opened it.
 export function MessageBubble({
   message,
   onFollowUp,

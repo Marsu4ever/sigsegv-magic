@@ -10,10 +10,10 @@
  * NOTE: the conversation resets on page reload. Fine for a demo; add
  * localStorage later if needed.
  */
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
-import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf, InsightsResponse } from "@/lib/types";
+import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
 import { MessageBubble } from "./MessageBubble";
@@ -84,8 +84,10 @@ export function ChatView() {
   const [mode, setMode] = useState<ChatResponse["mode"] | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
-  // What-if mode: a reply with `whatIf` shows WhatIfPanel above the conversation.
-  const [whatIf, setWhatIf] = useState<WhatIf | null>(null);
+  // What-if mode: the latest reply with `whatIf` shows WhatIfPanel right above its text, so the
+  // chart comes first and the coach's explanation sits under it — from the landing chip or a
+  // follow-up deep in the chat alike. WHY one panel: a new what-if replaces the old one (fresh state).
+  const [whatIfReply, setWhatIfReply] = useState<ChatMessage | null>(null);
   // WHY a counter: used as the panel's React key, so each new what-if starts fresh.
   const [whatIfKey, setWhatIfKey] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -171,8 +173,8 @@ export function ChatView() {
     if (whatIfKey > 0) panelRef.current?.scrollIntoView({ block: "start" });
   }, [whatIfKey]);
 
-  function showWhatIf(w: WhatIf) {
-    setWhatIf(w);
+  function showWhatIf(reply: ChatMessage) {
+    setWhatIfReply(reply);
     setWhatIfKey((k) => k + 1);
   }
 
@@ -184,7 +186,7 @@ export function ChatView() {
     inFlight.current?.abort();
     inFlight.current = null;
     setMessages([]);
-    setWhatIf(null);
+    setWhatIfReply(null);
     setLoading(false);
     window.scrollTo({ top: 0 });
   }
@@ -234,7 +236,7 @@ export function ChatView() {
       const { reply, mode } = data as ChatResponse;
       setMode(mode);
       setMessages((m) => [...m, reply]); // WHY functional: keeps notes added while waiting
-      if (reply.whatIf) showWhatIf(reply.whatIf);
+      if (reply.whatIf) showWhatIf(reply);
     } catch (err) {
       if (controller.signal.aborted) return; // user started a new chat — drop it quietly
       const text =
@@ -330,23 +332,25 @@ export function ChatView() {
             </div>
           </div>
         )}
-        {whatIf && (
-          <div ref={panelRef} className="scroll-mt-2">
-            <WhatIfPanel
-              key={whatIfKey}
-              initial={whatIf}
-              onClose={() => setWhatIf(null)}
-              onNotice={addNotice}
-            />
-          </div>
-        )}
         {messages.map((m, i) => (
-          <MessageBubble
-            key={i}
-            message={m}
-            // WHY only the latest reply: older offers are stale once the chat moved on.
-            onFollowUp={i === messages.length - 1 && !loading ? send : undefined}
-          />
+          // WHY compare the object: the reply that opened the panel, wherever it is in the chat.
+          <Fragment key={i}>
+            {m === whatIfReply && m.whatIf && (
+              <div ref={panelRef} className="scroll-mt-2">
+                <WhatIfPanel
+                  key={whatIfKey}
+                  initial={m.whatIf}
+                  onClose={() => setWhatIfReply(null)}
+                  onNotice={addNotice}
+                />
+              </div>
+            )}
+            <MessageBubble
+              message={m}
+              // WHY only the latest reply: older offers are stale once the chat moved on.
+              onFollowUp={i === messages.length - 1 && !loading ? send : undefined}
+            />
+          </Fragment>
         ))}
         {/* WHY a bubble skeleton: shows where the answer will appear. The seconds stay
             (after 3 s) so a slow model is visibly still working. */}

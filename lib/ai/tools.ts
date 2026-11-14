@@ -50,7 +50,7 @@ import {
   transactionRows,
 } from "@/lib/data/money";
 import { compareToPeers, getBenchmarks } from "@/lib/insights/benchmarks";
-import { everydayLeaks } from "@/lib/insights/leaks";
+import { everydayLeaks, habitSkipOne } from "@/lib/insights/leaks";
 import { irregularBuffer } from "@/lib/insights/irregular";
 import { monthProgress } from "@/lib/insights/monthProgress";
 import { basketTree } from "@/lib/insights/basketTree";
@@ -392,18 +392,22 @@ const TOOLS: Tool[] = [
     run: (a) => everydayLeaks(rangeFrom(a, "last_90_days"), clampNumber(a.max_eur, 1, 500, 20)),
   },
   {
-    // The what-if VIEW (chart + Month / 3 / 6 months toggle). The older what_if below
-    // stays as a sub-tool (per-month / per-year saving) for a later section of that view.
+    // The what-if VIEW (chart + Month / 3 / 6 months toggle). what_if below = a habit's saving
+    // as bars (1 / 3 / 6 months), e.g. after the leaks chart (DECISIONS.md #44).
     name: "what_if_spending",
     description:
-      "Main tool for 'what if I spent less on X?'. Predicts the next 1, 3 or 6 months as the user's average month " +
+      "Opens the interactive what-if view for 'what if I spent less on X?', 'what will I spend on X next " +
+      "month / in 3 or 6 months?' (a forecast). For a saving on a habit ('skip one cafe visit a week', 'how much " +
+      "would I save if I cut X by N%', follow-ups to the everyday_leaks chart) use what_if instead. Predicts the next 1, 3 or 6 months as the user's average month " +
       "on X (last 12 months, or all history if shorter; see average) × months, unchanged vs with a cut, and opens " +
       "a what-if chart of the last 1, 3 or 6 months for the user. lastYear = same months a year ago (info only). category: e.g. 'restaurants', " +
       "'eating out' (= restaurants + cafes + takeaway), 'groceries', 'taxi'. only: optional list of exact " +
       "categories or merchant types to narrow it, e.g. ['Cafes'] or ['Fast food'] (the result's breakdown shows " +
-      "what is inside). cut_pct: 5, 10 or 20, default 5 — the % the view opens on; the result's cutOptions " +
-      "has the saving for all three. months: 1, 3 or 6, default 1 — only set it if the user names " +
-      "a period. monthsWithData in the result says which periods have data.",
+      "what is inside). cut_pct: the % less the view opens on, a whole number 1–100, default 5. The chart has " +
+      "buttons for 5, 10 and 20; any other % the user names " +
+      "gets its own button. The result's cutOptions has the saving for every button. months: 1, 3 or 6, " +
+      "default 1 — set it when the user or your own question names a period. monthsWithData in the result " +
+      "says which periods have data.",
     properties: {
       category: { type: "string" },
       only: { type: "array", items: { type: "string" } },
@@ -430,22 +434,56 @@ const TOOLS: Tool[] = [
   {
     name: "what_if",
     description:
-      "Answers 'How much could I save if I cut X by N%?'. Uses average monthly spending over the period (default last 90 days) for a category/merchant type or a basket. change_percent: -20 = spend 20% less.",
+      "Saving from a habit change: 'skip one cafe visit a week', 'how much would I save if I cut taxis by 20%', " +
+      "'how does that add up over 3 or 6 months?' — the natural next step after the everyday_leaks chart. Uses the " +
+      "average month over the period (default last 90 days, the same as everyday_leaks) for a category / merchant " +
+      "type (e.g. 'Cafes') or a basket. change_percent: -20 = spend 20% less. skip_one: true = the habit's " +
+      "'skip one' nudge from everyday_leaks (Skip 1 a week / a month / every 2nd), no % needed; category must " +
+      "then be the habit's name from everyday_leaks. periods = as now / after / saving for 1, 3 and 6 months. " +
+      "It shows the user its own bar chart (as now vs after, for a month, 3 and 6 months) — " +
+      "don't call show_chart for it.",
     properties: {
       ...periodProps,
       change_percent: { type: "number", description: "e.g. -20 for a 20% cut." },
       category: { type: "string", description: "e.g. 'restaurants', 'taxi'." },
       basket: { type: "string", enum: [...BASKETS] },
+      skip_one: { type: "boolean", description: "true = the habit's 'skip one' nudge instead of a %." },
     },
-    required: ["change_percent"],
+    required: [],
     chartable: true,
-    run: (a) =>
-      whatIf({
-        range: rangeFrom(a, "last_90_days"),
+    run: (a) => {
+      const range = rangeFrom(a, "last_90_days");
+      const category = optString(a.category);
+      // WHY computed here, not passed by the AI: the "yes" usually comes a turn after the leaks
+      // chart, when the AI no longer sees its numbers (it invented "14 %" for CUST01350).
+      if (a.skip_one === true || a.skip_one === "true") {
+        const skip = habitSkipOne(range, category ?? "");
+        if (!skip) {
+          return {
+            error: `No "skip one" nudge for "${category}" in this period.`,
+            // WHY the savings too: with names only, the model invented an amount for one of them.
+            habitsWithSkipOne: everydayLeaks(range)
+              .groups.filter((g) => g.skipOne)
+              .map((g) => ({ name: g.name, perMonthEur: g.perMonthEur, ...g.skipOne })),
+            next: "Offer one of these habits; for its saving over 1, 3 and 6 months call what_if with skip_one for it.",
+          };
+        }
+        return {
+          ...whatIf({ range, changePercent: -skip.pct, habit: skip.habit, afterLabel: skip.label }),
+          // WHY: in a follow-up turn the model no longer sees everyday_leaks and offered habits
+          // the customer doesn't have ("coffee or public transport"). These are the real ones.
+          otherHabitsWithSkipOne: everydayLeaks(range)
+            .groups.filter((g) => g.skipOne && g.name !== skip.habit)
+            .map((g) => `${g.name} (${g.skipOne!.label})`),
+        };
+      }
+      return whatIf({
+        range,
         changePercent: clampNumber(a.change_percent, -100, 500, -20),
-        category: optString(a.category),
+        category,
         basket: optBasket(a.basket),
-      }),
+      });
+    },
   },
   {
     name: "safe_to_spend",
@@ -607,7 +645,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 export type ToolResult = {
   /** JSON string sent back to the LLM. */
   content: string;
-  /** Set only by show_chart — the UI renders it. */
+  /** Set by show_chart, and by what_if (draws its own chart) — the UI renders it. */
   chart?: ChartSpec;
   /** Set only by what_if_spending — opens the what-if view. */
   whatIf?: WhatIf;
@@ -634,18 +672,14 @@ const SPENDING_TOOLS = new Set([
  * WHY decided here and not by the AI: the meaning comes from which data tool made
  * the number, so the color is always right. Unset = neutral (balance, loan, %).
  */
-function rowTone(tool: string, row: ChartRow, rows: ChartRow[]): MoneyTone | undefined {
+function rowTone(tool: string, row: ChartRow): MoneyTone | undefined {
   if (SPENDING_TOOLS.has(tool)) return "out";
   switch (tool) {
     case "income_summary": // Income · Spending · Kept
       return row.label === "Spending" || row.value < 0 ? "out" : "in";
     case "safe_to_spend": // costs before payday are negative; the rest is money you have
       return row.value < 0 ? "out" : "in";
-    case "what_if": {
-      // "Now" is today's spending; "After −20 %" is the better choice if it's lower.
-      const now = rows[0]?.value ?? 0;
-      return row === rows[0] || row.value > now ? "out" : "in";
-    }
+    // what_if: its rows carry tone + tone2 already (lib/insights/whatIf.ts).
     default:
       return undefined;
   }
@@ -686,7 +720,22 @@ export function runTool(name: string, args: Args): ToolResult {
   const tool = BY_NAME.get(name);
   if (tool) {
     const out = tool.run(args);
-    return { content: forLlm(out), ...(out.whatIf ? { whatIf: out.whatIf } : {}) };
+    // WHY what_if draws its own chart: a saving without the bars is the "numbers but no chart"
+    // answer users got when the model forgot show_chart. Same path as show_chart, so it looks the same.
+    const chart =
+      name === "what_if" && !out.error && out.rows?.length
+        ? runTool("show_chart", {
+            chart_type: "bar",
+            title: `${out.what}: as now vs ${(out.seriesNames?.[1] ?? "after").toLowerCase()}`,
+            data_tool: "what_if",
+            data_args: args,
+          }).chart
+        : undefined;
+    return {
+      content: forLlm(out),
+      ...(out.whatIf ? { whatIf: out.whatIf } : {}),
+      ...(chart ? { chart } : {}),
+    };
   }
 
   if (name === "show_chart") {
@@ -728,7 +777,7 @@ export function runTool(name: string, args: Args): ToolResult {
     const rawRows = out.rows ?? [];
     const toneTool = type === "heatmap" ? "spend_over_time" : dataTool.name;
     const rows = rawRows.map((r) => {
-      const tone = r.tone ?? rowTone(toneTool, r, rawRows);
+      const tone = r.tone ?? rowTone(toneTool, r);
       return tone ? { ...r, tone } : r;
     });
     const chart: ChartSpec = {
@@ -746,7 +795,10 @@ export function runTool(name: string, args: Args): ToolResult {
       ...(type === "leaks" && out.view ? { leaks: out.view } : {}),
       ...(out.periodLabel ? { periodLabel: out.periodLabel } : {}),
     };
-    return { content: JSON.stringify({ shown: true, rows: rows.length }), chart };
+    // WHY the data too, not only {shown}: Qwen often calls show_chart without the data tool,
+    // then had no numbers and invented them ("Cafes €48.20" for a customer with no cafes).
+    // forLlm drops the screen-only parts and thins long row lists, as for any tool.
+    return { content: forLlm({ ...out, shown: true }), chart };
   }
 
   return { content: JSON.stringify({ error: `Unknown tool "${name}"` }) };

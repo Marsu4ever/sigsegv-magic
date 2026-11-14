@@ -3,6 +3,7 @@
  * A centered row of round buttons where exactly one is selected, e.g. 5% | 10% | 20%.
  * Same props as SegmentedControl, so the two are easy to swap.
  * Reusable for any 2–4 short options (a few characters each).
+ * WHY gap-3 with 4 options: four 64 px circles still fit a 390 px phone inside a card.
  */
 export function CircleOptions<T extends string | number>(props: {
   options: { value: T; label: string }[];
@@ -11,7 +12,11 @@ export function CircleOptions<T extends string | number>(props: {
   ariaLabel: string;
 }) {
   return (
-    <div role="group" aria-label={props.ariaLabel} className="flex justify-center gap-4">
+    <div
+      role="group"
+      aria-label={props.ariaLabel}
+      className={`flex justify-center ${props.options.length > 3 ? "gap-3" : "gap-4"}`}
+    >
       {props.options.map((o) => {
         const selected = o.value === props.value;
         return (

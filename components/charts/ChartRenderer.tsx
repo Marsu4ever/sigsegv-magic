@@ -119,11 +119,12 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
                 : (basketColor(r.label) ?? toneColor(r.tone) ?? "var(--accent)"),
           }),
     }));
-  const SECOND_COLOR = "#a9b1a9";
   // Lines and the first of two series: red if every row is spending, green if every
-  // row is money in (see toneColor), otherwise the usual accent.
-  const tones = new Set(spec.rows.map((r) => r.tone));
-  const mainColor = (tones.size === 1 && toneColor([...tones][0])) || "var(--accent)";
+  // row is money in (see toneColor), otherwise the usual accent. The second series the
+  // same way from tone2 (e.g. what_if's "20% less" in green), otherwise grey.
+  const uniformTone = (tones: Set<ChartRow["tone"]>) => tones.size === 1 && toneColor([...tones][0]);
+  const mainColor = uniformTone(new Set(spec.rows.map((r) => r.tone))) || "var(--accent)";
+  const SECOND_COLOR = uniformTone(new Set(spec.rows.map((r) => r.tone2))) || "#a9b1a9";
   const tiltLabels =
     !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
   const height = compact ? 160 : 340;

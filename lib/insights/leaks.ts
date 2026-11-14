@@ -17,14 +17,68 @@
  *   ≥ 2× a month   → "Skip 1 a month"  (12 × average)
  *   ≥ 0.5× a month → "Skip every 2nd"  (half the yearly cost)
  *   rarer          → no chip
+ * habitSkipOne() gives what_if the share of a habit's purchases that skipping removes
+ * (e.g. 2 a week, skip 1 → 50 %), so what_if(skip_one) shows the same saving as the habit card,
+ * as bars for 1 / 3 / 6 months. WHY not via the AI: the AI only sees tool results of the current
+ * turn, so it invented a % ("14 %") when the user said yes a turn later.
  */
-import type { ChartRow, DateRange, LeaksView } from "@/lib/types";
-import { getTransactions, isSpending, merchantType, round2, spentEur } from "@/lib/data";
+import type { ChartRow, DateRange, LeaksView, Transaction } from "@/lib/types";
+import { clampToHistory, getTransactions, isSpending, merchantType, round2, spentEur } from "@/lib/data";
 import { monthsInRange } from "@/lib/data/money";
 
 export const SMALL_PURCHASE_MAX_EUR = 20;
 
-export function everydayLeaks(range: DateRange, smallMaxEur = SMALL_PURCHASE_MAX_EUR) {
+/**
+ * The "skip one" nudge for a habit, or null when it's too rare. See SKIP ONE above.
+ * pct = the share of the habit's purchases that are skipped, in % (exact, not rounded).
+ */
+function skipOne(g: { timesPerMonth: number; averageEur: number; perYearEur: number }) {
+  const s =
+    g.timesPerMonth >= 6
+      ? { label: "Skip 1 a week", savesPerYearEur: g.averageEur * 52, skippedPerMonth: 52 / 12 }
+      : g.timesPerMonth >= 2
+        ? { label: "Skip 1 a month", savesPerYearEur: g.averageEur * 12, skippedPerMonth: 1 }
+        : g.timesPerMonth >= 0.5
+          ? { label: "Skip every 2nd", savesPerYearEur: g.perYearEur / 2, skippedPerMonth: g.timesPerMonth / 2 }
+          : null;
+  if (!s) return null;
+  return {
+    label: s.label,
+    savesPerYearEur: round2(s.savesPerYearEur),
+    pct: (s.skippedPerMonth / g.timesPerMonth) * 100,
+  };
+}
+
+/**
+ * The habit a purchase belongs to: its merchant type (e.g. "Restaurant", "Fast food"), else its
+ * category. WHY exported: what_if(skip_one) must sum exactly the habit card's purchases — a
+ * text match on "restaurant" also caught the whole Restaurants category (fast food included).
+ */
+export function habitName(t: Transaction): string {
+  return merchantType(t.mccCode) ?? t.category;
+}
+
+/** skipOne without the exact %, as shown on the habit card. */
+function skipLabel(g: Parameters<typeof skipOne>[0]) {
+  const s = skipOne(g);
+  return s && { label: s.label, savesPerYearEur: s.savesPerYearEur };
+}
+
+/**
+ * The "skip one" nudge for one habit (name as in everyday_leaks, case-insensitive) in a range,
+ * with its exact %. null = not one of the top habits there, or too rare for a nudge.
+ */
+export function habitSkipOne(
+  range: DateRange,
+  name: string,
+): { habit: string; label: string; pct: number } | null {
+  const g = everydayLeaks(range).groups.find((x) => x.name.toLowerCase() === name.trim().toLowerCase());
+  const s = g && skipOne(g);
+  return s ? { habit: g.name, label: s.label, pct: s.pct } : null;
+}
+
+export function everydayLeaks(asked: DateRange, smallMaxEur = SMALL_PURCHASE_MAX_EUR) {
+  const range = clampToHistory(asked); // short history → average over what the customer has
   const months = monthsInRange(range);
   const groups = new Map<
     string,
@@ -40,7 +94,7 @@ export function everydayLeaks(range: DateRange, smallMaxEur = SMALL_PURCHASE_MAX
     if (!isSpending(t) || t.basket !== "everyday") continue;
     const eur = spentEur(t);
     everyday += eur;
-    const key = merchantType(t.mccCode) ?? t.category;
+    const key = habitName(t);
     const g = groups.get(key) ?? { count: 0, total: 0, categories: new Map() };
     g.count++;
     g.total += eur;
@@ -88,21 +142,14 @@ export function everydayLeaks(range: DateRange, smallMaxEur = SMALL_PURCHASE_MAX
     periodDays: Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000) + 1,
     leakiestDays,
     habits: list.slice(0, 8).map((g) => {
-      const skip =
-        g.timesPerMonth >= 6
-          ? { label: "Skip 1 a week", savesPerYearEur: g.averageEur * 52 }
-          : g.timesPerMonth >= 2
-            ? { label: "Skip 1 a month", savesPerYearEur: g.averageEur * 12 }
-            : g.timesPerMonth >= 0.5
-              ? { label: "Skip every 2nd", savesPerYearEur: g.perYearEur / 2 }
-              : null;
+      const skip = skipLabel(g);
       return {
         name: g.name,
         category: g.category,
         timesPerMonth: g.timesPerMonth,
         averageEur: g.averageEur,
         perYearEur: g.perYearEur,
-        skip: skip && { label: skip.label, savesPerYearEur: round2(skip.savesPerYearEur) },
+        skip,
       };
     }),
     drops: drops.sort((a, b) => a.date.localeCompare(b.date)),
@@ -127,6 +174,9 @@ export function everydayLeaks(range: DateRange, smallMaxEur = SMALL_PURCHASE_MAX
       averageEur: g.averageEur,
       perMonthEur: g.perMonthEur,
       perYearEur: g.perYearEur,
+      // WHY for the AI too: the leaks chart shows these chips, so the coach talks about them.
+      // The saving over 1 / 3 / 6 months comes from what_if with skip_one (habitSkipOne).
+      skipOne: skipLabel(g),
     })),
     rows, // per-month euros by purchase type
     view, // for the "leaks" chart (not sent to the AI)

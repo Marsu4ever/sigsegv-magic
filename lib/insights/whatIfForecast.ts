@@ -16,9 +16,9 @@
  * DEFAULT TARGET: the customer's biggest everyday-basket group (getDefaultTarget) — the chip
  * "What if I spent less on X?" and the AI's fallback when X is unclear (DECISIONS.md #27).
  *
- * WHY a separate file from whatIf.ts: whatIf.ts is the older "average per month × %"
- * tool (what_if). It stays as it is, as a sub-tool that can become an extra section
- * of the what-if view later.
+ * WHY a separate file from whatIf.ts: whatIf.ts is the "average per month × %" tool (what_if)
+ * for a habit's saving over the last 90 days, drawn as bars (DECISIONS.md #44). This file is the
+ * forecast view.
  */
 import type {
   ChartRow,
@@ -33,7 +33,7 @@ import type {
   Transaction,
   WhatIf,
 } from "@/lib/types";
-import { CUT_OPTIONS, FORECAST_MONTHS } from "@/lib/types";
+import { CUT_OPTIONS, FORECAST_MONTHS, cutOptionsWith } from "@/lib/types";
 import {
   addDays,
   addMonths,
@@ -207,7 +207,7 @@ function calculate(
     withCutEur,
     savingEur,
     // WHY all options: the coach's message lists the saving for 5 / 10 / 20 % at once.
-    cutOptions: CUT_OPTIONS.map((c) => cutTotals(noChangeEur, c)),
+    cutOptions: cutOptionsWith(cutPct).map((c) => cutTotals(noChangeEur, c)),
     points: projectionPoints({
       daily,
       lookbackFrom: lookback.from,
@@ -376,12 +376,15 @@ export function parseMonths(v: unknown): ForecastMonths | undefined {
 }
 
 /**
- * One of CUT_OPTIONS (5 / 10 / 20); anything else → DEFAULT_CUT_PCT.
- * WHY only these: the view has one circle per option, so another % couldn't be shown as selected.
+ * A whole % from 1 to 100 ("17", 17.4 or −17 → 17); junk, 0 or > 100 → DEFAULT_CUT_PCT.
+ * WHY any %, not only CUT_OPTIONS: the coach can open the view on a % from the conversation
+ * (e.g. a habit's "skip one" share); the panel then adds it as an extra circle (cutOptionsWith).
+ * WHY abs: the older what_if tool uses −20 for "20 % less" and models mix the two up.
  */
 export function parseCutPct(v: unknown): number {
-  const n = Number(v);
-  return CUT_OPTIONS.includes(n) ? n : DEFAULT_CUT_PCT;
+  if (v === null || v === undefined || v === "") return DEFAULT_CUT_PCT;
+  const n = Math.round(Math.abs(Number(v)));
+  return Number.isFinite(n) && n >= 1 && n <= 100 ? n : DEFAULT_CUT_PCT;
 }
 
 /** Validate a target sent back by the UI (JSON). Anything malformed → null. */

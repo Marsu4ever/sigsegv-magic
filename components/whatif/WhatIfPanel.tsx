@@ -1,7 +1,8 @@
 "use client";
 /**
  * The what-if view: "What if I spent less on X?" (5 / 10 / 20 %). Owner: UI person.
- * Shown above the conversation in the chat when a reply carries a `whatIf`.
+ * Shown in the chat right above the reply that carries a `whatIf` (from the landing chip or
+ * later in the conversation), so the reply reads as the explanation under the chart.
  *
  * FLOW: the first result comes from the AI's tool call (ChatMessage.whatIf). The toggle, the
  * % circles and the category buttons call GET /api/what-if (no AI) — it runs the same
@@ -14,7 +15,7 @@
  */
 import { useRef, useState } from "react";
 import type { ForecastMonths, SpendingTarget, WhatIf } from "@/lib/types";
-import { CUT_OPTIONS, FORECAST_LABELS, FORECAST_MONTHS, FORECAST_PERIOD_TEXT } from "@/lib/types";
+import { FORECAST_LABELS, FORECAST_MONTHS, FORECAST_PERIOD_TEXT, cutOptionsWith } from "@/lib/types";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { CircleOptions } from "@/components/ui/CircleOptions";
 import { CountUp } from "@/components/ui/CountUp";
@@ -55,6 +56,9 @@ export function WhatIfPanel({
     cutPct: initial.cutPct,
   });
   const [shown, setShown] = useState<WhatIf>(initial);
+  // 5 / 10 / 20 %, plus the AI's % when it opened the view on another one (e.g. 17 % = "skip one
+  // a week"). WHY from `initial` only: that circle stays while the user taps around.
+  const [cutChoices] = useState(() => cutOptionsWith(initial.cutPct));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // "You'd save" is tappable: shows / hides the totals (before → after) under it.
@@ -216,7 +220,7 @@ export function WhatIfPanel({
       {shown.status !== "not_enough_data" && (
         <CircleOptions
           ariaLabel="How much less"
-          options={CUT_OPTIONS.map((c) => ({ value: c, label: `${c}%` }))}
+          options={cutChoices.map((c) => ({ value: c, label: `${c}%` }))}
           value={req.cutPct}
           onChange={(c) => load(req.target, req.months, c)}
         />
