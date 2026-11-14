@@ -22,6 +22,7 @@ import {
   label,
   pct,
 } from "./labels";
+import { DevHeaderButton } from "@/components/DevButton";
 
 /** Opens the chat and asks this question straight away (see ChatView). */
 const askUrl = (q: string) => `/chat?ask=${encodeURIComponent(q)}`;
@@ -270,9 +271,12 @@ export function MortgageView() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="border-b border-line bg-surface px-4 py-3">
-        <h1 className="font-semibold">Home loan</h1>
-        {data && <p className="text-xs text-muted">Application {data.mortgageId}</p>}
+      <header className="flex items-center justify-between gap-2 border-b border-line bg-surface px-4 py-3">
+        <div>
+          <h1 className="font-semibold">Home loan</h1>
+          {data && <p className="text-xs text-muted">Application {data.mortgageId}</p>}
+        </div>
+        <DevHeaderButton />
       </header>
 
       <div className="space-y-4 p-4">
