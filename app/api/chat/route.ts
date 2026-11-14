@@ -9,6 +9,7 @@ import type { ChatRequest, ChatResponse } from "@/lib/types";
 import { runChat } from "@/lib/ai/chat";
 
 export async function POST(request: Request) {
+  const start = Date.now();
   let body: ChatRequest;
   try {
     body = await request.json();
@@ -19,13 +20,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "messages must be a non-empty array" }, { status: 400 });
   }
 
+  const question = body.messages.at(-1)?.text ?? "";
+  console.log(`[api/chat] ← "${question.slice(0, 80)}" (${body.messages.length} messages)`);
+
   try {
     const result: ChatResponse = await runChat(body.messages);
+    console.log(`[api/chat] → done in ${Date.now() - start}ms`);
     return Response.json(result);
   } catch (err) {
-    // WHY log + generic message: the terminal running `npm run dev` shows
-    // the real error for debugging; the phone just gets a friendly message.
-    console.error("[api/chat]", err);
+    // WHY the full error in the terminal but a short one in the chat:
+    // the terminal is for debugging; the chat just needs to say what broke.
+    console.error(`[api/chat] ✗ failed after ${Date.now() - start}ms:`, err);
     const detail = err instanceof Error ? err.message : String(err);
     return Response.json({ error: "The AI failed to answer.", detail }, { status: 502 });
   }

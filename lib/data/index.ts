@@ -9,13 +9,7 @@
  * All functions return plain data. They never format text for humans —
  * that is the AI's / UI's job.
  */
-import type {
-  Basket,
-  ChartRow,
-  DateRange,
-  Transaction,
-  WeekSummary,
-} from "@/lib/types";
+import type { Basket, ChartRow, DateRange, Transaction, WeekSummary } from "@/lib/types";
 import { BASKETS } from "@/lib/types";
 import {
   addDays,
@@ -27,20 +21,40 @@ import {
   type Period,
 } from "./dates";
 import { loadCustomerData } from "./load";
+import { merchantType } from "./merchantTypes";
 
-export { getCustomerId } from "./load";
+export { getCustomerId, listDemoCustomerIds, loadCustomerFile, getDatasetCategories } from "./load";
 export { PERIODS, type Period } from "./dates";
+export { allMerchantTypes, merchantType } from "./merchantTypes";
 
 // ─── Basics ──────────────────────────────────────────────────────────────
 
 /**
- * ⚠️ ASSUMPTION (verify with real data): spending is a NEGATIVE amount,
- * income is positive — the usual bank-statement convention.
- * If the real data uses positive amounts + transaction_type instead,
- * this function and spentEur() are the only places to change.
+ * Money moved to the user's own savings/investments. Negative in the data,
+ * but NOT spending — counting it would make savers look like big spenders.
+ * (Real dataset categories, checked 14 Nov.)
+ */
+const NOT_SPENDING_CATEGORIES = new Set(["invest deposit", "invest withdraw", "salary sweep"]);
+
+const INCOME_CATEGORIES = new Set(["salary", "other income"]);
+
+export type CategoryKind = "spending" | "income" | "savings_move";
+
+/** What kind of money movement a dataset category is. */
+export function categoryKind(category: string): CategoryKind {
+  const c = category.toLowerCase();
+  if (NOT_SPENDING_CATEGORIES.has(c)) return "savings_move";
+  if (INCOME_CATEGORIES.has(c)) return "income";
+  return "spending";
+}
+
+/**
+ * Spending = a NEGATIVE amount that isn't a transfer to savings.
+ * Verified against the real dataset (14 Nov): purchases, housing and
+ * utility payments are negative; salary and other income are positive.
  */
 export function isSpending(t: Transaction): boolean {
-  return t.amountEur < 0;
+  return t.amountEur < 0 && !NOT_SPENDING_CATEGORIES.has(t.category.toLowerCase());
 }
 
 /** How much was spent, as a positive number of euros. */
@@ -83,6 +97,18 @@ function sortDesc(rows: ChartRow[]): ChartRow[] {
   return rows.sort((a, b) => b.value - a.value);
 }
 
+/**
+ * Does a transaction match a search word like "taxi" or "groceries"?
+ * Checks the category AND the merchant type from the MCC code.
+ * Returns the label to group it under, or null if it doesn't match.
+ */
+function matchLabel(t: Transaction, needle?: string): string | null {
+  if (!needle) return t.category;
+  if (t.category.toLowerCase().includes(needle)) return t.category;
+  const mt = merchantType(t.mccCode);
+  return mt && mt.toLowerCase().includes(needle) ? mt : null;
+}
+
 /** List of all category names this customer has, for the AI to match against. */
 export function listCategories(): string[] {
   return [...new Set(loadCustomerData().transactions.map((t) => t.category))].sort();
@@ -92,20 +118,19 @@ export function listCategories(): string[] {
 
 /**
  * Total spent per category in a range, biggest first.
- * If `category` is given, only categories containing that text
- * (case-insensitive), e.g. "taxi".
+ * If `category` is given, only transactions whose category OR merchant type
+ * contains that text (case-insensitive), e.g. "taxi" → grouped as "Taxi".
  */
 export function spendByCategory(range: DateRange, category?: string): ChartRow[] {
   const needle = category?.trim().toLowerCase();
   const totals = new Map<string, number>();
   for (const t of getTransactions(range)) {
     if (!isSpending(t)) continue;
-    if (needle && !t.category.toLowerCase().includes(needle)) continue;
-    totals.set(t.category, (totals.get(t.category) ?? 0) + spentEur(t));
+    const label = matchLabel(t, needle);
+    if (!label) continue;
+    totals.set(label, (totals.get(label) ?? 0) + spentEur(t));
   }
-  return sortDesc(
-    [...totals].map(([label, value]) => ({ label, value: round2(value) })),
-  );
+  return sortDesc([...totals].map(([label, value]) => ({ label, value: round2(value) })));
 }
 
 /** Total spent per basket in a range. Always returns all 3 baskets. */
@@ -139,7 +164,7 @@ export function spendOverTime(
   const needle = category?.trim().toLowerCase();
   for (const t of getTransactions(range)) {
     if (!isSpending(t)) continue;
-    if (needle && !t.category.toLowerCase().includes(needle)) continue;
+    if (!matchLabel(t, needle)) continue;
     const key = bucketOf(t.date);
     totals.set(key, (totals.get(key) ?? 0) + spentEur(t));
   }
@@ -153,7 +178,7 @@ export function listTransactions(
 ): Transaction[] {
   const needle = opts.category?.trim().toLowerCase();
   return getTransactions(range)
-    .filter((t) => !needle || t.category.toLowerCase().includes(needle))
+    .filter((t) => matchLabel(t, needle) !== null)
     .filter((t) => !opts.basket || t.basket === opts.basket)
     .reverse()
     .slice(0, opts.limit ?? 20);
@@ -161,8 +186,13 @@ export function listTransactions(
 
 // ─── Week tab ────────────────────────────────────────────────────────────
 
+/**
+ * WHY "last 7 days" and not the calendar week (team decision): the dataset
+ * ends mid-week, so a calendar week can be almost empty. 7 days always
+ * gives a full week of data.
+ */
 export function getWeekSummary(): WeekSummary {
-  const range = periodToRange("this_week");
+  const range = periodToRange("last_7_days");
   const byBasket = basketBreakdown(range);
   const byDay = spendOverTime(range, "day").map((r) => ({
     label: weekdayLabel(r.label),

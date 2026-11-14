@@ -8,7 +8,7 @@
  * Used automatically when LLM_BASE_URL / LLM_MODEL are not set, or AI_MODE=mock.
  */
 import type { ChartSpec, ChatMessage } from "@/lib/types";
-import { listCategories } from "@/lib/data";
+import { allMerchantTypes, listCategories } from "@/lib/data";
 import { runTool } from "./tools";
 
 function chart(args: Record<string, unknown>): ChartSpec | undefined {
@@ -35,7 +35,10 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
       data_tool: "basket_breakdown",
       data_args: { period: "this_month" },
     });
-    return reply(`This month you've spent €${total(c)} in total. Here's how it splits across your 3 baskets.`, c);
+    return reply(
+      `This month you've spent €${total(c)} in total. Here's how it splits across your 3 baskets.`,
+      c,
+    );
   }
 
   if (q.includes("trend") || q.includes("over time")) {
@@ -48,7 +51,10 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     return reply("Here's your weekly spending over the last 90 days.", c);
   }
 
-  const category = listCategories().find((cat) => q.includes(cat.toLowerCase()));
+  // Match a category or merchant type; "taxis" matches "Taxi" via its stem.
+  const category = [...listCategories(), ...allMerchantTypes()].find((cat) =>
+    q.includes(cat.toLowerCase()),
+  );
   if (category) {
     const c = chart({
       chart_type: "table",
@@ -60,13 +66,14 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   }
 
   if (q.includes("week")) {
+    // WHY last 7 days: the dataset ends mid-week (same rule as the Week tab).
     const c = chart({
       chart_type: "bar",
-      title: "This week by category",
+      title: "Last 7 days by category",
       data_tool: "spend_by_category",
-      data_args: { period: "this_week" },
+      data_args: { period: "last_7_days" },
     });
-    return reply(`So far this week you've spent €${total(c)}.`, c);
+    return reply(`In the last 7 days you've spent €${total(c)}.`, c);
   }
 
   return reply(

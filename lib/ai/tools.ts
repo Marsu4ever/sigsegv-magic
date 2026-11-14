@@ -15,8 +15,8 @@
  *   - add a definition to TOOL_DEFINITIONS
  *   - add a case to runTool()
  */
-import type OpenAI from "openai";
 import type { Basket, ChartSpec, ChartType, DateRange } from "@/lib/types";
+import type { ToolDefinition } from "./llm";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import {
   PERIODS,
@@ -50,7 +50,7 @@ type DataToolName = (typeof DATA_TOOL_NAMES)[number];
 
 // ─── Definitions sent to the LLM ─────────────────────────────────────────
 
-export const TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
@@ -131,6 +131,14 @@ export const TOOL_DEFINITIONS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           data_args: {
             type: "object",
             description: "Arguments for data_tool, same as calling it directly.",
+            // WHY listed explicitly: some models (e.g. Gemini) reject an
+            // "object" parameter that has no properties.
+            properties: {
+              ...periodArgs,
+              group_by: { type: "string", enum: ["day", "week", "month"] },
+              category: { type: "string" },
+            },
+            required: ["period"],
           },
         },
         required: ["chart_type", "title", "data_tool", "data_args"],
@@ -213,7 +221,10 @@ export function runTool(name: string, args: Args): ToolResult {
 
   if (name === "show_chart") {
     const dataTool = String(args.data_tool);
-    if (!(DATA_TOOL_NAMES as readonly string[]).includes(dataTool) || dataTool === "list_transactions") {
+    if (
+      !(DATA_TOOL_NAMES as readonly string[]).includes(dataTool) ||
+      dataTool === "list_transactions"
+    ) {
       return { content: JSON.stringify({ error: `Unknown data_tool "${dataTool}"` }) };
     }
     // WHY parse strings: some models send nested objects as a JSON string.

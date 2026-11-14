@@ -27,6 +27,21 @@ shown with a yellow "mock AI" badge). Everything works without any keys.
 
 ---
 
+## Team pages (see the data without reading code)
+
+Click the small **🛠** in the far bottom-right corner of the browser window (or open these while `npm run dev` runs):
+
+| Page | What's there |
+|---|---|
+| http://localhost:3000/dev | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
+| http://localhost:3000/data | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison |
+| http://localhost:3000/customer_profiles | All demo customers grouped by spending type, with the line to copy into `.env.local` |
+| http://localhost:3000/api/health | Is the data loading? Which AI settings are active? |
+
+Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/DevButton.tsx`.
+
+---
+
 ## How the code runs
 
 ```
@@ -82,12 +97,13 @@ The raw dataset is ~350 MB and is **not** in our git repo.
    ```
 4. Run:
    ```bash
-   npm run prepare-data                          # top 3 customers by number of transactions
+   npm run prepare-data                          # 30 varied customers (6 per age group, low → high spenders)
    npm run prepare-data -- --customers CUST00001  # or pick specific ones
    ```
    This writes `data/demo/<customer>.json` (small — **commit these** so teammates don't need the raw CSV)
    and `data/demo/_categories.json` (every category name, to fix the basket table).
 5. In `.env.local` set `DEMO_CUSTOMER_ID=CUST000xx` and restart `npm run dev`.
+   Easiest: pick one on http://localhost:3000/customer_profiles and copy its line.
 
 The script prints sample rows — check that spending amounts are negative. If not, update `isSpending()`
 in `lib/data/index.ts`.
@@ -96,7 +112,7 @@ in `lib/data/index.ts`.
 
 In `.env.local`:
 ```
-LLM_BASE_URL=https://....modal.run/v1   # any OpenAI-compatible endpoint
+LLM_BASE_URL=https://....modal.run/v1   # any "chat completions" endpoint (Modal, Gemini, Claude…)
 LLM_API_KEY=...
 LLM_MODEL=...
 ```
@@ -115,6 +131,26 @@ Set `AI_MODE=mock` to switch back without deleting your settings.
 - Open a PR on GitHub, someone glances at it, merge.
 - Never commit `.env.local` (it's git-ignored) or the raw CSVs in `data/raw/`.
 
+## When something breaks
+
+1. **Look at the terminal running `npm run dev`.** Every chat request logs its steps:
+   ```
+   [api/chat] ← "How much on taxis?" (1 messages)
+   [ai] mode=live model=... host=...
+   [ai] round 1: asking LLM…
+   [ai] round 1: LLM replied in 1200ms, wants 1 tool(s)
+   [ai]   spend_by_category({...}) → {...}
+   [ai] round 2: final answer in 900ms
+   [api/chat] → done in 2150ms
+   ```
+   The last line printed shows where it stopped. Errors say what failed and the likely fix
+   (wrong key, wrong model name, rate limit, timeout…).
+2. **Open http://localhost:3000/api/health** — checks the data and AI settings.
+   **http://localhost:3000/api/health?ping=1** also sends ONE test request to the AI, like the chat does.
+3. The chat itself shows the error message instead of hanging (30 s limit per AI request).
+4. Browser-side errors: DevTools → Console (lines start with `[chat]`).
+5. **`npm run diagnose`** — tests the AI connection straight from Node (DNS, IPv4, IPv6, fetch), outside the app.
+
 ## Useful commands
 
 | Command | What it does |
@@ -125,6 +161,8 @@ Set `AI_MODE=mock` to switch back without deleting your settings.
 | `npm run build` | Production build (what Vercel runs) |
 | `npm run mock-data` | Regenerate the fake `MOCK` customer |
 | `npm run prepare-data` | Raw CSV → small demo customer files |
+| `npm run benchmarks` | Raw CSV → `data/benchmarks.json` (averages from all customers, by age group) |
+| `npm run diagnose` | Test the AI connection from Node, outside the app |
 
 ## Conventions
 

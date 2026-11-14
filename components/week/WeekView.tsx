@@ -3,14 +3,20 @@
  * "This week" tab — simple overview, no AI. Owner: UI person.
  * Data comes from GET /api/week (lib/data/index.ts → getWeekSummary).
  *
- * NOTE: "this week" = the latest week IN THE DATASET, Monday → latest day,
- * not the real calendar week (the data is synthetic). See lib/data/dates.ts.
+ * NOTE: shows the LAST 7 DAYS in the dataset (ending on its latest day), not the
+ * real calendar week — the data is synthetic and ends mid-week. See getWeekSummary().
  */
 import { useEffect, useState } from "react";
 import type { WeekSummary } from "@/lib/types";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { formatValue } from "@/components/charts/ChartRenderer";
+
+/** "2026-09-23" → "23.9.2026" (Finnish style). */
+function fiDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d}.${m}.${y}`;
+}
 
 const BASKET_DOT: Record<string, string> = {
   mandatory_regular: "var(--basket-regular)",
@@ -35,10 +41,10 @@ export function WeekView() {
   return (
     <div className="h-full overflow-y-auto">
       <header className="border-b border-line bg-surface px-4 py-3">
-        <h1 className="font-semibold">This week</h1>
+        <h1 className="font-semibold">Last 7 days</h1>
         {data && (
           <p className="text-xs text-muted">
-            {data.range.from} → {data.range.to}
+            {fiDate(data.range.from)} – {fiDate(data.range.to)}
           </p>
         )}
       </header>
@@ -50,8 +56,10 @@ export function WeekView() {
         {data && (
           <>
             <section className="rounded-xl bg-surface p-4 shadow-sm">
-              <p className="text-sm text-muted">Spent so far</p>
-              <p className="text-3xl font-bold tabular-nums">{formatValue(data.totalSpentEur, "€")}</p>
+              <p className="text-sm text-muted">Spent</p>
+              <p className="text-3xl font-bold tabular-nums">
+                {formatValue(data.totalSpentEur, "€")}
+              </p>
             </section>
 
             <section className="rounded-xl bg-surface p-4 shadow-sm">
@@ -60,7 +68,10 @@ export function WeekView() {
                 {BASKETS.map((b) => (
                   <li key={b} className="flex items-center justify-between text-sm">
                     <span className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: BASKET_DOT[b] }} />
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ background: BASKET_DOT[b] }}
+                      />
                       {BASKET_LABELS[b]}
                     </span>
                     <span className="tabular-nums">{formatValue(data.byBasket[b], "€")}</span>
@@ -70,7 +81,9 @@ export function WeekView() {
             </section>
 
             <ChartCard spec={{ type: "bar", title: "By day", unit: "€", rows: data.byDay }} />
-            <ChartCard spec={{ type: "table", title: "Top categories", unit: "€", rows: data.topCategories }} />
+            <ChartCard
+              spec={{ type: "table", title: "Top categories", unit: "€", rows: data.topCategories }}
+            />
           </>
         )}
       </div>

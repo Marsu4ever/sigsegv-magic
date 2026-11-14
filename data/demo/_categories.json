@@ -1,0 +1,62 @@
+[
+ {
+  "category": "Groceries",
+  "count": 868519
+ },
+ {
+  "category": "Restaurants",
+  "count": 759280
+ },
+ {
+  "category": "Transportation",
+  "count": 626930
+ },
+ {
+  "category": "Utilities",
+  "count": 342728
+ },
+ {
+  "category": "Entertainment",
+  "count": 302691
+ },
+ {
+  "category": "Health",
+  "count": 151912
+ },
+ {
+  "category": "Salary",
+  "count": 121725
+ },
+ {
+  "category": "Home & Tech",
+  "count": 115086
+ },
+ {
+  "category": "Housing",
+  "count": 112903
+ },
+ {
+  "category": "Lifestyle",
+  "count": 110916
+ },
+ {
+  "category": "Travel",
+  "count": 65377
+ },
+ {
+  "category": "Invest Deposit",
+  "count": 35668
+ },
+ {
+  "category": "Other Income",
+  "count": 6299
+ },
+ {
+  "category": "Salary Sweep",
+  "count": 6189
+ },
+ {
+  "category": "Invest Withdraw",
+  "count": 532
+ }
+]

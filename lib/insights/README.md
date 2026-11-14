@@ -3,7 +3,7 @@
 Smarter analysis built on top of `lib/data`. Empty on purpose — this is your space.
 
 Ideas from the challenge brief (pick what the team agrees on):
-- **Benchmarks** — compare with Statistics Finland averages (by age group / postal area).
+- **Benchmarks** — ✅ `benchmarks.ts` + `data/benchmarks.json`: compare the user with everyone in the dataset of the same age group (`compareToPeers()`). Statistics Finland data could be added on top.
 - **"What kind of spender am I?"** — classify spending patterns.
 - **whatIf** — "How much could I save if I cut dining out by 20%?" *(parked for now)*
 - **safeToSpend** — "What's safe for me to spend this week?" *(parked for now)*

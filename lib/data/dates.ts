@@ -54,6 +54,7 @@ export function weekdayLabel(s: string): string {
  * in a prompt.
  */
 export const PERIODS = [
+  "last_7_days",
   "this_week",
   "last_week",
   "this_month",
@@ -71,12 +72,10 @@ export type Period = (typeof PERIODS)[number];
  * the real current date. "This week" must mean the last week IN THE DATA,
  * otherwise everything would be empty. See getDataToday() in lib/data.
  */
-export function resolvePeriod(
-  period: Period,
-  today: string,
-  firstDate: string,
-): DateRange {
+export function resolvePeriod(period: Period, today: string, firstDate: string): DateRange {
   switch (period) {
+    case "last_7_days":
+      return { from: addDays(today, -6), to: today };
     case "this_week":
       return { from: startOfWeek(today), to: today };
     case "last_week": {

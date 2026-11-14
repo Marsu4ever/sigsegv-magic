@@ -9,6 +9,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { TabBar } from "@/components/TabBar";
+import { DevButton } from "@/components/DevButton";
 
 export const metadata: Metadata = {
   title: "Money Coach",
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="min-h-0 flex-1">{children}</main>
           <TabBar />
         </div>
+        {/* Team-only shortcut, outside the app column. */}
+        <DevButton />
       </body>
     </html>
   );

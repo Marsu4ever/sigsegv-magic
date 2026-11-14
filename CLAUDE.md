@@ -12,3 +12,4 @@ Hackathon project: AI money coach for S-Bank (Junction 2026). Team of 4. Read RE
 - Mobile first (~390 px wide). Keep code simple and readable — teammates must understand it fast.
 - Before finishing: `npm run typecheck` and `npm run lint` must pass.
 - Never commit `.env.local` or anything in `data/raw/`.
+- Debugging: check `[ai]` / `[api/chat]` lines in the `npm run dev` terminal and `GET /api/health?ping=1`. Keep logging when adding steps; never log API keys.

@@ -15,6 +15,13 @@ import type { ChatMessage, ChatResponse } from "@/lib/types";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
+/**
+ * WHY a client-side limit too: even if the server never answers (crash,
+ * network drop), the chat shows an error instead of "Thinking…" forever.
+ * Must be longer than the server's worst case (2 tries × 30s × a few rounds).
+ */
+const CLIENT_TIMEOUT_MS = 120_000;
+
 // Suggested starter questions (from the challenge brief). Edit freely.
 const SUGGESTIONS = [
   "How are my 3 baskets looking?",
@@ -27,7 +34,19 @@ export function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState<ChatResponse["mode"] | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Count seconds while waiting, so a slow answer is visibly "still working".
+  useEffect(() => {
+    if (!loading) return;
+    const started = Date.now();
+    const id = setInterval(() => setElapsed(Math.round((Date.now() - started) / 1000)), 1000);
+    return () => {
+      clearInterval(id);
+      setElapsed(0);
+    };
+  }, [loading]);
 
   // Keep the newest message in view.
   useEffect(() => {
@@ -43,17 +62,33 @@ export function ChatView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
+        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
       });
-      const data = await res.json();
+      // WHY read text first: if the server crashed it may send HTML, not JSON.
+      const raw = await res.text();
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(
+          `Server sent a non-JSON reply (HTTP ${res.status}). Check the npm run dev terminal.`,
+        );
+      }
       if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
       const { reply, mode } = data as ChatResponse;
       setMode(mode);
       setMessages([...next, reply]);
     } catch (err) {
-      setMessages([
-        ...next,
-        { role: "assistant", text: `⚠️ Something went wrong: ${err instanceof Error ? err.message : err}` },
-      ]);
+      const text =
+        err instanceof DOMException && err.name === "TimeoutError"
+          ? `No answer after ${CLIENT_TIMEOUT_MS / 1000}s. Check the npm run dev terminal for [ai] lines.`
+          : err instanceof TypeError
+            ? "Could not reach the server. Is npm run dev still running?"
+            : err instanceof Error
+              ? err.message
+              : String(err);
+      console.error("[chat]", err); // browser DevTools console
+      setMessages([...next, { role: "assistant", text: `⚠️ ${text}` }]);
     } finally {
       setLoading(false);
     }
@@ -64,7 +99,9 @@ export function ChatView() {
       <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
         <h1 className="font-semibold">Money Coach</h1>
         {mode === "mock" && (
-          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">mock AI</span>
+          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">
+            mock AI
+          </span>
         )}
       </header>
 
@@ -89,7 +126,7 @@ export function ChatView() {
         {messages.map((m, i) => (
           <MessageBubble key={i} message={m} />
         ))}
-        {loading && <p className="text-sm text-muted">Thinking…</p>}
+        {loading && <p className="text-sm text-muted">Thinking…{elapsed >= 3 && ` ${elapsed}s`}</p>}
         <div ref={bottomRef} />
       </div>
 

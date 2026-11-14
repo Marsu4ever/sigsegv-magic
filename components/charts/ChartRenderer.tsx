@@ -29,16 +29,27 @@ export function formatValue(value: number, unit: string): string {
     : `${value} ${unit}`;
 }
 
-/** Shorten ISO dates on axes: "2026-11-03" → "3.11." (Finnish style). */
-function shortLabel(label: string): string {
-  const m = label.match(/^\d{4}-(\d{2})-(\d{2})$/);
-  return m ? `${Number(m[2])}.${Number(m[1])}.` : label;
+/**
+ * Shorten ISO dates on axes (Finnish style):
+ * daily/weekly "2026-11-03" → "3.11." · monthly "2026-11-01" → "11/26".
+ * WHY: monthly data spans years, so the year must show or months repeat.
+ */
+function shortLabel(label: string, monthly: boolean): string {
+  const m = label.match(/^\d{2}(\d{2})-(\d{2})-(\d{2})$/);
+  if (!m) return label;
+  return monthly ? `${Number(m[2])}/${m[1]}` : `${Number(m[3])}.${Number(m[2])}.`;
+}
+
+function isMonthly(rows: { label: string }[]): boolean {
+  return rows.length > 1 && rows.every((r) => /^\d{4}-\d{2}-01$/.test(r.label));
 }
 
 export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
   if (spec.rows.length === 0) {
     return <p className="py-6 text-center text-sm text-muted">No data for this period.</p>;
   }
+
+  const monthly = isMonthly(spec.rows);
 
   if (spec.type === "table") {
     const rows = compact ? spec.rows.slice(0, 5) : spec.rows;
@@ -47,7 +58,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
         <tbody>
           {rows.map((r) => (
             <tr key={r.label} className="border-b border-line last:border-0">
-              <td className="py-1.5 pr-2">{shortLabel(r.label)}</td>
+              <td className="py-1.5 pr-2">{shortLabel(r.label, monthly)}</td>
               <td className="py-1.5 text-right tabular-nums">{formatValue(r.value, spec.unit)}</td>
             </tr>
           ))}
@@ -70,7 +81,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
     .filter((r) => spec.type !== "pie" || r.value > 0) // zero-size slices render as glitches
     .map((r, i) => ({
       ...r,
-      label: shortLabel(r.label),
+      label: shortLabel(r.label, monthly),
       fill: spec.type === "pie" ? colorFor(r.label, i) : (basketColor(r.label) ?? "var(--accent)"),
     }));
   const height = compact ? 160 : 320;
@@ -106,7 +117,8 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 11 }}
-                interval={compact ? "preserveStartEnd" : 0}
+                // WHY: show every label only when they fit (≤ 12 bars).
+                interval={compact || data.length > 12 ? "preserveStartEnd" : 0}
               />
               <YAxis tick={{ fontSize: 11 }} width={40} />
               {tooltip}

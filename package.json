@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "mock-data": "node scripts/generate-mock-data.mjs",
-    "prepare-data": "node scripts/prepare-data.mjs"
+    "prepare-data": "node scripts/prepare-data.mjs",
+    "diagnose": "node scripts/diagnose-ai.mjs",
+    "benchmarks": "node scripts/build-benchmarks.mjs"
   },
   "dependencies": {
     "next": "16.4.6",
