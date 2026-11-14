@@ -6,6 +6,7 @@
  * tested and changed without touching the HTTP layer.
  */
 import type { ChatRequest, ChatResponse } from "@/lib/types";
+import { LESSON_TOPICS } from "@/lib/types";
 import { runChat } from "@/lib/ai/chat";
 import { getCustomerId } from "@/lib/data";
 import { withPickedCustomer } from "@/lib/data/request";
@@ -23,14 +24,19 @@ export async function POST(request: Request) {
   }
 
   const question = body.messages.at(-1)?.text ?? "";
+  // WHY filter: comes from the browser's storage; unknown values are ignored, not trusted.
+  const seen = Array.isArray(body.seenLessons)
+    ? LESSON_TOPICS.filter((t) => body.seenLessons!.includes(t))
+    : [];
 
   try {
     // WHY wrapped: the AI's tools then read the customer picked in the app (lib/data/request.ts).
     const result: ChatResponse = await withPickedCustomer(() => {
       console.log(
-        `[api/chat] ← customer=${getCustomerId()} "${question.slice(0, 80)}" (${body.messages.length} messages)`,
+        `[api/chat] ← customer=${getCustomerId()} "${question.slice(0, 80)}" (${body.messages.length} messages` +
+          `${seen.length ? `, lessons seen: ${seen.join(",")}` : ""})`,
       );
-      return runChat(body.messages);
+      return runChat(body.messages, seen);
     });
     console.log(`[api/chat] → done in ${Date.now() - start}ms`);
     return Response.json(result);

@@ -20,6 +20,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { LessonProgress } from "@/components/education/LessonProgress";
 
 const KIND: Record<InsightKind, { label: string; icon: IconName }> = {
   risk: { label: "Coming up", icon: "alert" },
@@ -234,6 +235,8 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
             Try again
           </button>
         </div>
+        {/* Lesson progress doesn't depend on insights, so it still shows. */}
+        <LessonProgress />
       </CollapsibleSection>
     );
   }
@@ -319,6 +322,8 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
         </div>
       )}
 
+      {/* Money lessons: how many "guess the number" cards are done (components/education). */}
+      <LessonProgress />
       {open && <InsightSheet insight={open} onClose={() => setOpen(null)} onHide={() => hide(open)} />}
     </CollapsibleSection>
   );

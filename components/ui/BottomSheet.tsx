@@ -2,7 +2,7 @@
 /**
  * A sheet that slides up from the bottom (phone pattern for details): dimmed backdrop,
  * a small label + title, a close button. Tap outside or press Esc to close. Owner: UI person.
- * Used by the coach insights and the account details on Home.
+ * Used by the coach insights, the account details and the money lessons on Home.
  */
 import { useEffect, useId, useRef } from "react";
 import { Icon } from "./Icon";

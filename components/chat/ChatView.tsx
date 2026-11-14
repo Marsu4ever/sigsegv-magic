@@ -16,9 +16,16 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { CountUp } from "@/components/ui/CountUp";
 import { tapHaptic } from "@/lib/haptic";
 import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
-import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
+import type {
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  SpendingTarget,
+  InsightsResponse,
+} from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
+import { seenTopics } from "@/lib/education/progress";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { DevHeaderButton } from "@/components/DevButton";
@@ -247,7 +254,8 @@ export function ChatView() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        // WHY seenLessons: the server must not replay a lesson the user has already seen (lib/education/progress.ts).
+        body: JSON.stringify({ messages: next, seenLessons: seenTopics() } satisfies ChatRequest),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(CLIENT_TIMEOUT_MS)]),
       });
       // WHY read text first: if the server crashed it may send HTML, not JSON.

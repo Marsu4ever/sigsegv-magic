@@ -31,11 +31,12 @@ import type {
   ChartType,
   DateRange,
   GoalDraft,
+  LessonSpec,
   MoneyTone,
   WhatIf,
 } from "@/lib/types";
 import type { ToolDefinition } from "./llm";
-import { BASKETS, BASKET_LABELS } from "@/lib/types";
+import { BASKETS, BASKET_LABELS, LESSON_TOPICS } from "@/lib/types";
 import {
   PERIODS,
   addMonths,
@@ -76,6 +77,7 @@ import { getGoalState } from "@/lib/goals/state";
 
 const getGoalToday = () => simToday(getGoalState());
 import { goalView } from "@/lib/goals/view";
+import { teachTool, type TeachContext } from "@/lib/education/topics";
 
 type Args = Record<string, unknown>;
 
@@ -853,6 +855,34 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       },
     },
   },
+  {
+    // Lesson cards (PLAN-financial-education.md, idea A). Like show_chart: the server builds the
+    // card (lib/education/topics.ts), the model only picks the topic.
+    type: "function",
+    function: {
+      name: "teach",
+      description:
+        "Show a short 'guess the number' lesson card under your reply: the user guesses a number from their own " +
+        "money with a slider, sees the real one, learns one thing and gets a link to S-Bank. Topics: micro_saving " +
+        "(small purchases per year, after the leaks chart), emergency_buffer (priciest surprise-cost month, after " +
+        "irregular_buffer), pay_yourself_first (share of income kept, after income_summary), compound_growth (a " +
+        "monthly saving over 10 years, after what_if / what_if_spending: pass the same category, skip_one, " +
+        "change_percent or cut_pct), asp_account (first-home savings; only if the user has no home loan). Call it when " +
+        "the user accepts your lesson offer or asks about the topic. The card explains the topic, so don't explain it " +
+        "yourself and don't give its number. One lesson per reply.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string", enum: [...LESSON_TOPICS] },
+          category: { type: "string", description: "compound_growth: the what_if category / habit." },
+          skip_one: { type: "boolean", description: "compound_growth: the habit's 'skip one' saving." },
+          change_percent: { type: "number", description: "compound_growth: e.g. -20, as in what_if." },
+          cut_pct: { type: "number", description: "compound_growth: as in what_if_spending." },
+        },
+        required: ["topic"],
+      },
+    },
+  },
 ];
 
 // ─── Running a tool ──────────────────────────────────────────────────────
@@ -866,6 +896,8 @@ export type ToolResult = {
   whatIf?: WhatIf;
   /** Set only by plan_goal — the "Save goal" card. */
   goalDraft?: GoalDraft;
+  /** Set only by teach — a lesson card under the reply. */
+  lesson?: LessonSpec;
 };
 
 /** Max rows sent to the LLM. WHY: e.g. 2 years of daily balances = 730 rows of tokens. */
@@ -937,7 +969,11 @@ function forLlm(full: ToolOutput): string {
   });
 }
 
-export function runTool(name: string, args: Args): ToolResult {
+/** ctx: only teach needs it (the conversation + lessons already seen); lib/ai/chat.ts passes it. */
+export function runTool(name: string, args: Args, ctx?: TeachContext): ToolResult {
+  if (name === "teach") {
+    return teachTool(args, ctx ?? { history: [], seen: [] });
+  }
   const tool = BY_NAME.get(name);
   if (tool) {
     const out = tool.run(args);

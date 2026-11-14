@@ -317,10 +317,22 @@ export type ChatMessage = {
   charts?: ChartSpec[]; // only on assistant messages
   whatIf?: WhatIf; // only on assistant messages; opens the what-if view
   goalDraft?: GoalDraft; // only on assistant messages; "Save goal" card (added for saving goals, additive)
+  /** Only on assistant messages: a "guess the number" lesson card under the reply. Added 14 Nov (additive). */
+  lessons?: LessonSpec[];
+  /**
+   * Only on assistant messages: a lesson chip under the reply ("🎯 Guess what small buys cost").
+   * Tapping it sends `text`, which shows the lesson card. Set by the server (lib/ai/chat.ts), not by
+   * the AI, so lessons come up the same with the mock and the real model. Added 14 Nov (additive).
+   */
+  lessonOffer?: { topic: LessonTopic; text: string };
 };
 
-/** POST /api/chat request body. Send the whole conversation so far. */
-export type ChatRequest = { messages: ChatMessage[] };
+/**
+ * POST /api/chat request body. Send the whole conversation so far.
+ * seenLessons (added 14 Nov, optional): lessons this user has already seen (saved on the device,
+ * lib/education/progress.ts). The server won't show them again unless the user asks about the topic.
+ */
+export type ChatRequest = { messages: ChatMessage[]; seenLessons?: LessonTopic[] };
 
 /** POST /api/chat response body. */
 export type ChatResponse = {
@@ -761,3 +773,58 @@ export type GoalView = {
 
 /** WhatIf.goalImpact: the what-if saving in days of the goal's weekly plan. */
 export type GoalImpact = { goalName: string; emoji: string; daysCloser: number };
+
+// ─── Financial education (lesson cards) ──────────────────────────────────
+// Added 14 Nov (new types + optional fields above only). Idea A "Arvaa!" of
+// PLAN-financial-education.md: the user guesses a number from their own money with a
+// slider, sees the real one, learns one thing and gets ONE link to S-Pankki.
+// Content: lib/education/topics.ts (server). Tool: teach (lib/ai/tools.ts). UI: components/education/.
+
+export type LessonTopic =
+  | "micro_saving"
+  | "emergency_buffer"
+  | "pay_yourself_first"
+  | "compound_growth"
+  | "asp_account";
+
+export const LESSON_TOPICS: LessonTopic[] = [
+  "micro_saving",
+  "emergency_buffer",
+  "pay_yourself_first",
+  "compound_growth",
+  "asp_account",
+];
+
+export type LessonLang = "fi" | "en";
+
+/** The card's one "read more" link. Opens the bank's (or the authority's) own site in a new tab. */
+export type LessonLink = { label: string; url: string; source: "s-pankki" | "valtiokonttori" };
+
+/** A lesson card under a coach reply, like a ChartSpec. Built by the server, never typed by the AI. */
+export type LessonSpec = {
+  topic: LessonTopic;
+  lang: LessonLang;
+  basket?: Basket; // colour stripe + which basket the lesson is about
+  title: string; // short name, e.g. "Small buys add up" (also the For you progress list)
+  hook: string; // the question the user guesses
+  body: string; // shown after the guess; numbers already filled in from our data
+  takeaway: string; // one thing to do, starts with a verb
+  link: LessonLink;
+  guess: {
+    label: string; // what the number is, e.g. "Per year"
+    answer: number; // the real number (from lib/data / lib/insights)
+    min: number;
+    max: number;
+    step: number;
+    start: number; // where the slider starts
+    unit: "€" | "%";
+    /** A guess within ± tolerance of the answer counts as right ("close enough"). */
+    tolerance: number;
+  };
+};
+
+/** One lesson this customer can do (For you progress list). `ask` opens the coach on it. */
+export type LessonInfo = { topic: LessonTopic; title: string; ask: string };
+
+/** GET /api/lessons response body. */
+export type LessonsResponse = { lessons: LessonInfo[] };

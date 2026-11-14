@@ -16,10 +16,22 @@ import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { runTool } from "./tools";
 import { splitFollowUp } from "@/lib/followUp";
 
+/**
+ * Data tools the current mock reply used. WHY: lib/ai/chat.ts offers a lesson card that fits
+ * (e.g. after the leaks chart), the way the real AI does from its prompt. Reset per reply.
+ */
+let toolsUsed: string[] = [];
+
+/** runTool, remembering which data tool ran (for toolsUsed). */
+function run(tool: string, args: Record<string, unknown> = {}) {
+  toolsUsed.push(tool);
+  return runTool(tool, args);
+}
+
 /** Run a tool and return its data (what the AI would see). */
 function data(tool: string, args: Record<string, unknown> = {}) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return JSON.parse(runTool(tool, args).content) as any;
+  return JSON.parse(run(tool, args).content) as any;
 }
 
 /** Make a chart exactly the way the AI would (show_chart). */
@@ -29,6 +41,7 @@ function chart(
   tool: string,
   args: Record<string, unknown> = {},
 ): ChartSpec | undefined {
+  toolsUsed.push(tool);
   return runTool("show_chart", { chart_type: type, title, data_tool: tool, data_args: args }).chart;
 }
 
@@ -137,6 +150,13 @@ const MOCK_OFFERS = [
  * Like the real AI (prompt.ts, HOW TO ANSWER): a "yes" does what the last reply offered,
  * and every reply ends with one offer the user can tap.
  */
+/** mockReply + the data tools it used (see toolsUsed). */
+export function mockReplyWithTools(history: ChatMessage[]): { reply: ChatMessage; tools: string[] } {
+  toolsUsed = [];
+  const reply = mockReply(history);
+  return { reply, tools: [...toolsUsed] };
+}
+
 export function mockReply(history: ChatMessage[]): ChatMessage {
   let asked = history;
   if (YES.test((history.at(-1)?.text ?? "").trim())) {
@@ -215,7 +235,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
         : undefined; // undefined → the tool's default, Month
     // Unclear X → the customer's biggest everyday group (same as the chip).
     const target = (resolveTarget(q) ?? getDefaultTarget()).label;
-    const w = runTool("what_if_spending", { category: target, months, cut_pct: pct }).whatIf;
+    const w = run("what_if_spending", { category: target, months, cut_pct: pct }).whatIf;
     if (w) return { ...reply(whatIfText(w)), whatIf: w };
   }
 
@@ -289,7 +309,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
       period: "last_90_days",
     };
     // WHY runTool, not chart(): what_if draws its own bar chart (as now vs after, 1 / 3 / 6 months).
-    const r = runTool("what_if", args);
+    const r = run("what_if", args);
     const w = JSON.parse(r.content);
     const six = w.periods.at(-1);
     return reply(

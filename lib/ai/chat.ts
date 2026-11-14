@@ -9,7 +9,7 @@
  * DEBUGGING: every step logs a line starting with [ai] to the terminal
  * running `npm run dev`. If the chat hangs or fails, look there first.
  */
-import type { ChartSpec, ChatMessage, GoalDraft, WhatIf } from "@/lib/types";
+import type { ChartSpec, ChatMessage, GoalDraft, LessonSpec, LessonTopic, WhatIf } from "@/lib/types";
 import {
   allMerchantTypes,
   getCustomer,
@@ -22,7 +22,21 @@ import { chatCompletion, LlmError, type LlmMessage } from "./llm";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, autoChartArgs, isChartable, runTool, usesMonthsRange } from "./tools";
-import { goalDraftText, mockReply } from "./mock";
+import { goalDraftText, mockReply, mockReplyWithTools } from "./mock";
+import {
+  answerAlreadyShown,
+  askedAbout,
+  buildLesson,
+  lessonAskedFor,
+  lessonInChat,
+  lessonIsOpen,
+  lessonLang,
+  lessonOffer,
+  lessonPromptInfo,
+  lessonRequested,
+  teachableTopic,
+  type TeachContext,
+} from "@/lib/education/topics";
 import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
@@ -168,6 +182,135 @@ function fallbackGoal(history: ChatMessage[]): { goalDraft: GoalDraft } | null {
 }
 
 /**
+ * Lesson safety net (PLAN-financial-education.md §4.6). WHY: the model may answer "What is an
+ * emergency buffer?" in text and forget teach. When the user clearly asked for a lesson (tapped
+ * its offer, or asked about its topic) we add the card. A clear ask may replay a seen lesson.
+ */
+function fallbackLessons(history: ChatMessage[]): LessonSpec[] {
+  try {
+    const topic = lessonAskedFor(history);
+    const lesson = topic && buildLesson(topic, lessonLang(history), {}, history);
+    if (!lesson) return [];
+    console.log(`[ai] model called no teach — added lesson ${lesson.topic} (the user asked for it)`);
+    return [lesson];
+  } catch (err) {
+    console.warn("[ai] lesson fallback failed:", err);
+    return [];
+  }
+}
+
+/**
+ * The lesson chip under a reply (ChatMessage.lessonOffer), or undefined.
+ * WHY decided here and not by the AI: Qwen kept its own "where could I save" button and almost
+ * never offered a lesson, so lessons never came up in live mode. Now the same rule runs for the
+ * mock and the real model: a teachable data tool ran this turn (e.g. the leaks chart) → offer that
+ * lesson, unless it's been seen, a card is already shown, or the coach's own button offers it.
+ */
+function lessonOfferFor(
+  history: ChatMessage[],
+  seen: LessonTopic[],
+  tools: string[],
+  reply: ChatMessage,
+): ChatMessage["lessonOffer"] {
+  if (reply.lessons?.length) return undefined;
+  const topic = teachableTopic(tools);
+  if (!topic || !lessonIsOpen(topic, seen) || lessonInChat(topic, history)) return undefined;
+  if (answerAlreadyShown(topic, history, reply.text)) return undefined;
+  const followUp = splitFollowUp(reply.text).followUp;
+  if (followUp && askedAbout(topic, followUp)) return undefined;
+  console.log(`[ai] lesson chip: ${topic}`);
+  return { topic, text: lessonOffer(topic, lessonLang(history)) };
+}
+
+/** Data tools behind the charts on a reply (for lessonOfferFor), e.g. a "leaks" chart → everyday_leaks. */
+function toolsBehindCharts(charts: ChartSpec[]): string[] {
+  return charts.flatMap((c) => (c.type === "leaks" ? ["everyday_leaks"] : []));
+}
+
+/**
+ * At most ONE card per reply (team call, DECISIONS #68): a chart, the what-if view, a goal card
+ * or a lesson card. WHY: two cards on a ~390 px phone pushed the answer off screen.
+ * Which one stays, in this order:
+ * 1. a lesson the user clearly asked for (tapped its chip, or asked about its topic);
+ * 2. the goal card (it has the Save button: the user's next step);
+ * 3. the what-if view (it is the chart for that answer);
+ * 4. the first chart (the model's main one; later ones were extras);
+ * 5. a lesson the model added on its own.
+ * Returns the lesson that was dropped, so it can still be offered as a chip.
+ */
+function oneCard(reply: ChatMessage, history: ChatMessage[]): { reply: ChatMessage; droppedLesson?: LessonTopic } {
+  const lesson = reply.lessons?.[0];
+  const charts = reply.charts ?? [];
+  const keep = (r: ChatMessage, why: string) => {
+    console.log(`[ai] one card per reply: kept ${why}`);
+    return r;
+  };
+  const cards = charts.length + (reply.whatIf ? 1 : 0) + (reply.goalDraft ? 1 : 0) + (lesson ? 1 : 0);
+  if (cards <= 1 && (reply.lessons?.length ?? 0) <= 1) return { reply };
+  const none = { charts: [], whatIf: undefined, goalDraft: undefined, lessons: undefined };
+  if (lesson && lessonAskedFor(history) === lesson.topic) {
+    return { reply: keep({ ...reply, ...none, lessons: [lesson] }, `lesson ${lesson.topic} (asked for)`) };
+  }
+  const droppedLesson = lesson?.topic;
+  if (reply.goalDraft) return { reply: keep({ ...reply, ...none, goalDraft: reply.goalDraft }, "goal card"), droppedLesson };
+  if (reply.whatIf) return { reply: keep({ ...reply, ...none, whatIf: reply.whatIf }, "what-if view"), droppedLesson };
+  if (charts.length) return { reply: keep({ ...reply, ...none, charts: [charts[0]] }, `chart ${charts[0].type}`), droppedLesson };
+  return { reply: keep({ ...reply, ...none, lessons: [lesson!] }, `lesson ${lesson!.topic}`) };
+}
+
+/** The reply text without its [[follow-up]] button and the short question just before it. */
+function withoutFollowUp(text: string): string {
+  const withoutButton = text.replace(/\s*\[\[.+?\]\]\s*/g, " ").trim();
+  // Drop the matching question too ("Want to see how you could save?"), if it ends the reply.
+  const sentences = withoutButton.split(/(?<=[.!?])\s+/);
+  if (sentences.length > 1 && sentences[sentences.length - 1].trim().endsWith("?")) sentences.pop();
+  return sentences.join(" ").trim();
+}
+
+/**
+ * Last step for every reply (live and mock): one card, then the lesson chip.
+ * A dropped lesson becomes the chip (it was relevant, just not as a second card).
+ * WHY no follow-up button with a lesson chip (team call): two suggestions in one reply split
+ * the user's attention; the lesson is the one we want them to try. The button is removed from
+ * the text too, so the model's history matches what the user saw.
+ */
+function finishReply(
+  raw: ChatMessage,
+  history: ChatMessage[],
+  seen: LessonTopic[],
+  tools: string[],
+): ChatMessage {
+  const { reply, droppedLesson } = oneCard(raw, history);
+  const offer =
+    droppedLesson &&
+    lessonIsOpen(droppedLesson, seen) &&
+    !lessonInChat(droppedLesson, history) &&
+    !answerAlreadyShown(droppedLesson, history, reply.text)
+      ? { topic: droppedLesson, text: lessonOffer(droppedLesson, lessonLang(history)) }
+      : lessonOfferFor(history, seen, [...tools, ...toolsBehindCharts(reply.charts ?? [])], reply);
+  if (!offer) return reply;
+  console.log(`[ai] lesson chip ${offer.topic}: follow-up button removed`);
+  return { ...reply, text: withoutFollowUp(reply.text), lessonOffer: offer };
+}
+
+/**
+ * Mock AI + lessons, so the demo works without a model: a clear ask shows the card; otherwise the
+ * mock's answer, with a lesson chip when it used a teachable tool (lessonOfferFor, same as live).
+ */
+function mockWithLessons(history: ChatMessage[], seen: LessonTopic[]): ChatMessage {
+  const lang = lessonLang(history);
+  const asked = lessonAskedFor(history);
+  const lesson = asked && buildLesson(asked, lang, {}, history);
+  if (lesson) {
+    console.log(`[ai] mock: lesson ${lesson.topic}`);
+    // WHY no text: the card is the whole answer (team call: nothing written above it).
+    return { role: "assistant", text: "", charts: [], lessons: [lesson] };
+  }
+  const { reply, tools } = mockReplyWithTools(history);
+  return finishReply(reply, history, seen, tools);
+}
+
+/**
  * One line telling the model what the user already sees under an earlier reply.
  * WHY: we send old replies as text only (charts would cost tokens), so the model didn't know
  * the leaks chart was already on screen and drew it again for every follow-up about a habit.
@@ -179,6 +322,7 @@ function onScreen(m: ChatMessage): string {
     ),
     ...(m.whatIf ? [`what-if view: ${m.whatIf.target.label}, ${m.whatIf.cutPct}% less`] : []),
     ...(m.goalDraft ? [`goal card "${m.goalDraft.name}" with a Save button`] : []),
+    ...(m.lessons ?? []).map((l) => `lesson card ${l.topic}`),
   ];
   return shown.length ? `\n[On screen: ${shown.join("; ")}]` : "";
 }
@@ -243,11 +387,7 @@ function withoutRepeatedOffer(text: string, history: ChatMessage[]): string {
   const asked = history.filter((m) => m.role === "user").map((m) => offerWords(m.text));
   if (!asked.some((words) => sameOffer(offer, words))) return text;
   console.log(`[ai] follow-up "${button[1]}" was already asked — button removed`);
-  const withoutButton = text.replace(/\s*\[\[.+?\]\]\s*/g, " ").trim();
-  // Drop the matching question too ("Want to see how you could save?"), if it ends the reply.
-  const sentences = withoutButton.split(/(?<=[.!?])\s+/);
-  if (sentences.length > 1 && sentences[sentences.length - 1].trim().endsWith("?")) sentences.pop();
-  return sentences.join(" ").trim();
+  return withoutFollowUp(text);
 }
 
 /** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
@@ -255,14 +395,31 @@ function withoutOnScreenNotes(text: string): string {
   return text.replace(/\s*\[On screen:[^\]\n]*\]/g, "").trim();
 }
 
-export async function runChat(history: ChatMessage[]): Promise<{
+/**
+ * seenLessons: lessons the user has already seen (saved on their device). They are not offered
+ * or shown again unless the user asks about the topic (lib/education/topics.ts → teachTool).
+ */
+export async function runChat(
+  history: ChatMessage[],
+  seenLessons: LessonTopic[] = [],
+): Promise<{
   reply: ChatMessage;
   mode: "live" | "mock";
 }> {
   const config = getAiConfig();
+
+  // A tapped lesson chip / For you "Try it" → the card alone: no text above it, no LLM call
+  // (faster, and the model can't paraphrase the lesson). WHY before the model: team call.
+  const requested = lessonRequested(history);
+  const card = requested && buildLesson(requested, lessonLang(history), {}, history);
+  if (card) {
+    console.log(`[ai] lesson requested: ${card.topic} (card only, no LLM)`);
+    return { reply: { role: "assistant", text: "", charts: [], lessons: [card] }, mode: config.mode };
+  }
+
   if (config.mode === "mock") {
     console.log("[ai] mode=mock (set LLM_BASE_URL + LLM_MODEL in .env.local for a real model)");
-    const reply = mockReply(history);
+    const reply = mockWithLessons(history, seenLessons);
     return { reply: { ...reply, text: euroAfter(noLongDashes(reply.text)) }, mode: "mock" };
   }
 
@@ -286,6 +443,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
         moneyNote: moneyHealthNote(),
         // WHY only the name: numbers in the prompt aren't tool results (amounts.ts would flag them).
         goalName: getGoalState().goal?.name ?? null,
+        lessons: lessonPromptInfo(seenLessons),
       }),
     },
     // WHY only text from history: earlier charts are already on screen; re-sending their
@@ -327,6 +485,9 @@ export async function runChat(history: ChatMessage[]): Promise<{
   // iphone 13" made Qwen write "300 €" (the user's "e" isn't read as euros), and the reply
   // became an apology above a correct goal card. With a card, the draft's sentence is used.
   let couldntWork = false;
+  const lessons: LessonSpec[] = []; // teach results: lesson cards (one per reply)
+  const teachCtx: TeachContext = { history, seen: seenLessons };
+  const toolsUsed: string[] = []; // data tools this turn (incl. show_chart's data_tool), for the lesson chip
 
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     console.log(`[ai] round ${round}: asking LLM…`);
@@ -478,6 +639,8 @@ export async function runChat(history: ChatMessage[]): Promise<{
       console.log(
         `[ai] round ${round}: final answer in ${ms(start)} (${(msg.content ?? "").length} chars)`,
       );
+      // Lesson cards: from teach, or the safety net when the user clearly asked for one.
+      const cards = lessons.length > 0 ? lessons : fallbackLessons(history);
       // Goal safety net (same idea as fallbackCharts): a "save X for Y" question answered
       // without plan_goal still gets the Save card from the mock's parse (real tool, real numbers).
       // WHY the draft's sentence replaces the model's text: without plan_goal, Qwen's text didn't
@@ -490,13 +653,14 @@ export async function runChat(history: ChatMessage[]): Promise<{
           text = goalDraftText(g.goalDraft);
         }
       }
-      if (couldntWork && !goalDraft) {
+      if (couldntWork && !goalDraft && cards.length === 0) {
         text = "Sorry, I couldn't work that out from your data. Try asking about one habit, like restaurants or fast food.";
       }
       // Empty answer → never an empty bubble. WHY: Qwen answered "300 e for iphone 13" (after
       // "what are you saving for?") with no text at all. With a goal card, code writes the
       // sentence from the draft; otherwise ask the model once more, then a fixed sentence.
-      if (!splitFollowUp(text).body.trim()) {
+      // WHY not with a lesson card: the card is the whole answer (team call: nothing written above it).
+      if (!splitFollowUp(text).body.trim() && cards.length === 0) {
         if (goalDraft) {
           console.warn("[ai] warning: final answer is empty — wrote the goal sentence from the draft");
           text = goalDraftText(goalDraft);
@@ -516,27 +680,26 @@ export async function runChat(history: ChatMessage[]): Promise<{
       // WHY a fixed offer with a goal card: the model kept offering "Save for my trip", which
       // duplicates the card's Save button. The habits behind the missions are the next step.
       if (goalDraft) text = `${splitFollowUp(text).body.trim()}\n[[Where does my money slip away?]]`;
-      // No chart from the model → safety net adds one, unless the what-if
-      // view opens (that panel already is the visual).
-      // WHY no safety-net chart with a goal card: the card is the visual for that answer.
-      const shown = charts.length > 0 || whatIf || goalDraft ? charts : fallbackCharts(history, lastChartable);
+      // No chart from the model → safety net adds one, unless the what-if view opens, or a goal
+      // card or a lesson card shows (each already is the visual for that answer).
+      const shown =
+        charts.length > 0 || whatIf || goalDraft || cards.length > 0 ? charts : fallbackCharts(history, lastChartable);
       // Asked for a chart and still none: say so instead of pretending.
       const noChartNote =
-        wantsChart && shown.length === 0 && !whatIf
+        wantsChart && shown.length === 0 && !whatIf && cards.length === 0
           ? "\n\nI couldn't draw a chart for that. Try e.g. \"income vs spending last 6 months\"."
           : "";
-      return {
-        reply: {
-          role: "assistant",
-          // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
-          // sure (lib/noDashes.ts, lib/euroAfter.ts).
-          text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))) + noChartNote,
-          charts: shown,
-          whatIf,
-          goalDraft,
-        },
-        mode: "live",
+      const reply: ChatMessage = {
+        role: "assistant",
+        // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
+        // sure (lib/noDashes.ts, lib/euroAfter.ts).
+        text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))) + noChartNote,
+        charts: shown,
+        whatIf,
+        goalDraft,
+        ...(cards.length > 0 ? { lessons: cards } : {}),
       };
+      return { reply: finishReply(reply, history, seenLessons, toolsUsed), mode: "live" };
     }
 
     console.log(
@@ -571,7 +734,11 @@ export async function runChat(history: ChatMessage[]): Promise<{
       }
       let result;
       try {
-        result = runTool(call.function.name, args);
+        result = runTool(call.function.name, args, teachCtx);
+        toolsUsed.push(call.function.name);
+        if (call.function.name === "show_chart" && typeof args.data_tool === "string") {
+          toolsUsed.push(args.data_tool);
+        }
       } catch (err) {
         // WHY catch per tool: a bug in one data function shouldn't kill the
         // whole answer. The LLM is told the tool failed and can say so.
@@ -599,20 +766,23 @@ export async function runChat(history: ChatMessage[]): Promise<{
       }
       if ("whatIf" in result && result.whatIf) whatIf = result.whatIf;
       if ("goalDraft" in result && result.goalDraft) goalDraft = result.goalDraft;
+      if ("lesson" in result && result.lesson) {
+        if (lessons.length === 0) lessons.push(result.lesson);
+        else console.log("[ai]   skipped a second lesson card (one per reply)");
+      }
       knownNumbers.push(...numbersIn(result.content));
       messages.push({ role: "tool", tool_call_id: call.id, content: result.content });
     }
   }
 
   console.warn(`[ai] stopped after ${MAX_TOOL_ROUNDS} rounds without a final answer`);
-  return {
-    reply: {
-      role: "assistant",
-      text: "Sorry, I got stuck working that out. Could you ask in a different way?",
-      charts,
-      whatIf,
-      goalDraft,
-    },
-    mode: "live",
+  const stuck: ChatMessage = {
+    role: "assistant",
+    text: "Sorry, I got stuck working that out. Could you ask in a different way?",
+    charts,
+    whatIf,
+    goalDraft,
+    ...(lessons.length > 0 ? { lessons } : {}),
   };
+  return { reply: oneCard(stuck, history).reply, mode: "live" };
 }
