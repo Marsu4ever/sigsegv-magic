@@ -9,10 +9,12 @@
  *                                              expenses / net; details in a sheet)
  *   2. safe to spend         → /api/home      (= the coach's safe_to_spend tool; the pace bar
  *                                              also uses /api/week's last-7-days total)
+ *   (saving goal strip       → /api/goal      only when a goal is set; GoalStrip, see DECISIONS #60c)
  *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
  *   4. spending breakdown    → /api/spending  (the month in the 3 baskets, expandable; the
  *                                              last 7 days are on /week)
  *   5. upcoming payments     → /api/home      (recurring bills / savings, next month)
+ *   (set a goal line         → /api/goal      only when NO goal is set; GoalStartRow, quiet text)
  *   6. recent transactions   → /api/account   (latest few; everything on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
  * WHY each section loads on its own (own skeleton): a slow part doesn't hold up the rest.
@@ -23,6 +25,8 @@ import type { AccountSummary, HomeExtrasResponse, WeekSummary } from "@/lib/type
 import { AccountOverview } from "./AccountOverview";
 import { TransactionDayList } from "@/components/account/TransactionList";
 import { InsightCards } from "@/components/insights/InsightCards";
+import { GoalStartRow, GoalStrip } from "@/components/goal/GoalStrip";
+import { useGoal } from "@/components/goal/api";
 import { SafeToSpendCard } from "./SafeToSpendCard";
 import { SpendingBreakdown } from "./SpendingBreakdown";
 import { UpcomingPayments } from "./UpcomingPayments";
@@ -90,6 +94,7 @@ export function HomeView() {
   const account = useJson<AccountSummary>("/api/account");
   const extras = useJson<HomeExtrasResponse>("/api/home");
   const week = useJson<WeekSummary>("/api/week");
+  const goal = useGoal().view;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -137,6 +142,9 @@ export function HomeView() {
           </SkeletonGroup>
         )}
 
+        {/* Saving goal: one line, only when a goal is set; taps through to /week (DECISIONS.md #60c) */}
+        <GoalStrip view={goal} />
+
         {/* 3. Coach insights (hides itself when there's nothing to say) */}
         <InsightCards title="Coach insights" />
 
@@ -157,6 +165,9 @@ export function HomeView() {
             </SkeletonGroup>
           )}
         </Section>
+
+        {/* No goal yet: a quiet "Set a goal" line, low on purpose (DECISIONS.md #60c) */}
+        <GoalStartRow view={goal} />
 
         {/* 6. Recent transactions */}
         <Section title="Recent transactions" link={{ href: "/activity", label: "See all" }}>
