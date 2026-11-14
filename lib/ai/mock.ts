@@ -110,6 +110,19 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
 
 function mockAnswer(history: ChatMessage[]): ChatMessage {
   const q = (history.at(-1)?.text ?? "").toLowerCase();
+  const replyText = (text: string): ChatMessage => ({ role: "assistant", text: `[mock AI] ${text}`, charts: [] });
+  // Proactive insights (lib/insights/proactive.ts): saving help and "what should I know".
+  if (has(q, "save more", "how can i save", "how could i save", "help me save", "ways to save")) {
+    const all = data("proactive_insights").insights as { kind: string; action: string; total?: { value: number } }[];
+    const help = all.find((i) => i.kind === "save_help");
+    // WHY fi-FI here: same "1 234 €" style as the insight texts it continues.
+    const year = help?.total ? ` That adds up to {+${Math.round(help.total.value).toLocaleString("fi-FI")} €} a year.` : "";
+    if (help) return replyText(`${help.action}${year}`);
+  }
+  if (has(q, "should i know", "anything new", "alerts", "how am i doing overall")) {
+    const all = data("proactive_insights").insights as { title: string }[];
+    return replyText(all.length ? `Here's what I noticed: ${all.map((i) => i.title).join("; ")}.` : "Nothing unusual right now.");
+  }
   const reply = (text: string, ...charts: (ChartSpec | undefined)[]): ChatMessage => ({
     role: "assistant",
     text: `[mock AI] ${text}`,

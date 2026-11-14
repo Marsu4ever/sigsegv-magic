@@ -59,6 +59,7 @@ import { safeToSpend } from "@/lib/insights/safeToSpend";
 import { spenderProfile } from "@/lib/insights/spenderProfile";
 import { whatIf } from "@/lib/insights/whatIf";
 import { getMortgageSummary } from "@/lib/data/mortgage";
+import { proactiveInsights } from "@/lib/insights/proactive";
 import { getWhatIf, parseCutPct, parseMonths } from "@/lib/insights/whatIfForecast";
 import { availableNames, resolveTarget, targetFromNames } from "@/lib/insights/targets";
 
@@ -480,6 +481,16 @@ const TOOLS: Tool[] = [
     properties: {},
     chartable: true,
     run: () => irregularBuffer(),
+  },
+
+  {
+    name: "proactive_insights",
+    description:
+      "What the app noticed without being asked, most important first: help to save (if the user keeps little or " +
+      "overspends), spending alerts, unusual activity, recurring payments. Each has what was noticed, why, and an action.",
+    properties: {},
+    chartable: false,
+    run: () => ({ insights: proactiveInsights() }),
   },
 
   // ── Home loan ──────────────────────────────────────────────────────────

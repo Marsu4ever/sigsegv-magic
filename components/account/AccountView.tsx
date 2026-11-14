@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import type { AccountSummary, AccountTransaction } from "@/lib/types";
 import { CategoryTile } from "@/components/charts/categoryIcons";
 import { BalanceChart } from "./BalanceChart";
+import { InsightCards } from "@/components/insights/InsightCards";
 import { fiDate, formatValue, weekdayDate } from "@/components/charts/format";
 import { DevHeaderButton } from "@/components/DevButton";
 import { Icon } from "@/components/ui/Icon";
@@ -162,6 +163,9 @@ export function AccountView() {
                 </p>
               </section>
             </div>
+
+            {/* What the coach noticed without being asked */}
+            <InsightCards />
 
             {/* Balance history */}
             {data.balanceHistory.length > 1 && (
