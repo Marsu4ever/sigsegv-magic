@@ -9,14 +9,16 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { requestChatReset } from "@/lib/chatReset";
 
 // WHY outline icons, not emoji: emoji looked homemade; these match the app.
-const TABS: { href: string; label: string; icon: IconName }[] = [
-  // WHY Chat first (far left): the AI coach is the app's main feature (team call).
-  { href: "/chat", label: "Chat", icon: "chat" },
-  // WHY "Account" + coins, not "Home": the house icon already means Home loan.
-  { href: "/account", label: "Account", icon: "coins" },
-  { href: "/week", label: "This week", icon: "calendar" },
-  // WHY always shown: customers without a mortgage get a friendly empty state.
-  { href: "/loan", label: "Home loan", icon: "home" },
+// WHY this order (changes the old "Chat first" call): the usual bank-app layout — Home
+// first, then the history, then the coach. Home merges the old Account + This week tabs.
+// `also`: pages without their own tab that light up this one (e.g. /week opens from Home).
+const TABS: { href: string; label: string; icon: IconName; also?: string[] }[] = [
+  { href: "/home", label: "Home", icon: "home", also: ["/week", "/account"] },
+  { href: "/activity", label: "Activity", icon: "activity" },
+  { href: "/chat", label: "Coach", icon: "chat" },
+  // WHY a key: the house icon now means Home. Always shown: customers without a mortgage
+  // get a friendly empty state.
+  { href: "/loan", label: "Home loan", icon: "key" },
 ];
 
 export function TabBar() {
@@ -24,7 +26,7 @@ export function TabBar() {
   return (
     <nav className="flex border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
       {TABS.map((tab) => {
-        const active = pathname.startsWith(tab.href);
+        const active = [tab.href, ...(tab.also ?? [])].some((p) => pathname.startsWith(p));
         return (
           <Link
             key={tab.href}

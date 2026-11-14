@@ -13,6 +13,7 @@ import type { DemoCustomerOption, DemoCustomersResponse } from "@/lib/types";
 import { switchDemoCustomer } from "@/lib/demoCustomer";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { versionLabel } from "@/lib/version";
+import { Icon } from "@/components/ui/Icon";
 
 const SHOW_CUSTOMER_SWITCHER = true;
 
@@ -98,12 +99,17 @@ function Sheet({ data, onClose }: { data: DemoCustomersResponse; onClose: () => 
             <h2 className="font-semibold">Choose a demo customer</h2>
             <p className="text-xs text-muted">The whole app switches to this person&apos;s data.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="px-2 text-xl text-muted">
-            ×
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+          >
+            <Icon name="close" size={20} />
           </button>
         </div>
 
-        <Group title={`🏠 With a home loan (${withLoan.length})`}>
+        <Group title={`With a home loan (${withLoan.length})`}>
           {withLoan.map((c) => (
             <Row key={c.id} c={c} current={c.id === data.current} />
           ))}
@@ -167,21 +173,23 @@ export function CustomerSwitcher() {
 
   return (
     <>
-      <div className="flex items-center bg-foreground pr-3 text-xs text-background">
+      {/* WHY its own "chrome" colours: dark in both themes (it was inverted, so a bright
+          strip glared over the dark theme), and clearly not part of the bank app. */}
+      <div className="flex items-center bg-chrome pr-3 text-xs text-chrome-foreground">
         <button
           type="button"
           onClick={() => data && setOpen(true)}
           className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1.5 pl-4 pr-2"
         >
           <span className="flex min-w-0 items-center gap-2">
-            <span className="rounded bg-background/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+            <span className="rounded bg-chrome-foreground/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
               DEMO
             </span>
             <span className="truncate">
               {!data
                 ? "Loading customer…"
                 : current
-                  ? `${current.id} · ${current.age} y${current.mortgage ? " · 🏠 home loan" : ""}`
+                  ? `${current.id} · ${current.age} y${current.mortgage ? " · home loan" : ""}`
                   : data.current === "MOCK"
                     ? "MOCK · fake data"
                     : data.current}
@@ -189,7 +197,7 @@ export function CustomerSwitcher() {
           </span>
           <span className="shrink-0 font-semibold">Switch ›</span>
         </button>
-        <ThemeToggle className="shrink-0 hover:bg-background/15" />
+        <ThemeToggle className="shrink-0 hover:bg-chrome-foreground/15" />
       </div>
       {open && data && <Sheet data={data} onClose={() => setOpen(false)} />}
     </>

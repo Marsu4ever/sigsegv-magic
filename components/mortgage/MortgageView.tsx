@@ -23,6 +23,7 @@ import {
   pct,
 } from "./labels";
 import { DevHeaderButton } from "@/components/DevButton";
+import { Icon } from "@/components/ui/Icon";
 import { SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 
 /** Opens the chat and asks this question straight away (see ChatView). */
@@ -56,7 +57,8 @@ function StatusCard({ m }: { m: MortgageSummary }) {
           approved ? "bg-accent/10 text-accent" : "bg-danger-soft text-danger"
         }`}
       >
-        {approved ? "✓ Approved" : "✕ Not approved"}
+        <Icon name={approved ? "check" : "close"} size={14} strokeWidth={2.5} />
+        {approved ? "Approved" : "Not approved"}
       </span>
       <p className="mt-3 text-sm text-muted">{label(PROPERTY_TYPE, m.property.type)}</p>
       <p className="text-3xl font-bold tabular-nums">{eur0(m.property.priceEur)}</p>
@@ -81,7 +83,7 @@ function StatusCard({ m }: { m: MortgageSummary }) {
         )}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground"
       >
-        💬 Ask the coach about this
+        <Icon name="chat" size={18} /> Ask the coach about this
       </Link>
     </Card>
   );
@@ -183,7 +185,9 @@ function HomesCard({ m }: { m: MortgageSummary }) {
         {m.propertiesConsidered.map((p) => (
           <li key={p.id} className="flex items-center justify-between gap-3 text-sm">
             <span className="flex items-center gap-2">
-              <span className="text-lg leading-none">{p.type === "apartment" ? "🏢" : "🏡"}</span>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                <Icon name={p.type === "apartment" ? "building" : "home"} size={16} />
+              </span>
               <span>
                 {label(PROPERTY_TYPE, p.type)}
                 {p.chosen && (
@@ -229,7 +233,8 @@ function TimelineCard({ m }: { m: MortgageSummary }) {
       </ol>
       {m.contactsWithBank > 0 && (
         <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
-          💬 You talked with the bank {m.contactsWithBank} times along the way.
+          <Icon name="chat" size={13} className="mr-1 inline align-[-2px]" />
+          You talked with the bank {m.contactsWithBank} times along the way.
         </p>
       )}
     </Card>
@@ -239,7 +244,9 @@ function TimelineCard({ m }: { m: MortgageSummary }) {
 function NoMortgage() {
   return (
     <Card>
-      <p className="text-3xl">🏠</p>
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+        <Icon name="home" size={24} />
+      </span>
       <p className="mt-2 font-semibold">No home loan application</p>
       <p className="mt-1 text-sm text-muted">
         Thinking about buying a home? The coach can help you see how much you could put aside each
@@ -247,9 +254,9 @@ function NoMortgage() {
       </p>
       <Link
         href={askUrl("How could I save more each month?")}
-        className="mt-4 flex w-full items-center justify-center rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground"
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-sm font-semibold text-accent-foreground"
       >
-        💬 Ask the coach
+        <Icon name="chat" size={18} /> Ask the coach
       </Link>
     </Card>
   );

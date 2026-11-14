@@ -32,7 +32,11 @@ import { CategoryTile } from "./categoryIcons";
 import { CountUp } from "@/components/ui/CountUp";
 
 const EVERYDAY = "var(--basket-everyday)";
-const GOLD_TEXT = "#a16207"; // readable gold for text on white
+// WHY theme tokens (app/globals.css), not fixed colours: the old white-pink box, white jar and
+// dark-gold text glared in dark mode. Mixing with --surface gives a soft tint in both themes.
+const EVERYDAY_TINT = `color-mix(in srgb, ${EVERYDAY} 10%, var(--surface))`;
+const JAR_GLASS = `color-mix(in srgb, ${EVERYDAY} 5%, var(--surface))`;
+const GOLD_TEXT = "var(--gold)";
 const eur0 = (n: number) =>
   n.toLocaleString("fi-FI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const eur = (n: number) => n.toLocaleString("fi-FI", { style: "currency", currency: "EUR" });
@@ -96,7 +100,7 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
       {!compact && (
         <div ref={bigJar} className="flex flex-col items-center">
           {/* The period, said once, as a small pill above the jar. */}
-          <span className="mb-2 rounded-full bg-background px-3 py-0.5 text-xs font-semibold text-muted">
+          <span className="mb-2 rounded-full bg-surface-2 px-3 py-0.5 text-xs font-semibold text-muted">
             Last {v.periodDays} days
           </span>
           <MarbleJar drops={v.drops} green={green} gold={gold} width={170} />
@@ -168,8 +172,8 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
         {/* Chat card shows only the 3 biggest — say so; full screen shows all. */}
         {compact ? (
           // Chat card: "Top 3" in bold yellow (no pill — team call).
-          // WHY #ca8a04: a deep yellow that stays readable on white.
-          <h3 className="text-base font-bold" style={{ color: "#ca8a04" }}>
+          // WHY var(--gold): deep yellow on white, bright yellow on dark (app/globals.css).
+          <h3 className="text-base font-bold" style={{ color: GOLD_TEXT }}>
             Top 3
           </h3>
         ) : (
@@ -196,7 +200,7 @@ function Headline({ v, saved, compact }: { v: LeaksView; saved: number; compact:
   return (
     <div
       className="flex-1 rounded-xl px-3 py-2.5 text-center"
-      style={{ background: `color-mix(in srgb, ${EVERYDAY} 9%, white)` }}
+      style={{ background: EVERYDAY_TINT }}
     >
       <div className="text-xs text-muted">Everyday spending costs you</div>
       <div
@@ -337,7 +341,7 @@ function MarbleJar({
       />
       <path
         d="M38 16 V28 Q10 30 10 52 V140 Q10 156 26 156 H94 Q110 156 110 140 V52 Q110 30 82 28 V16"
-        fill="color-mix(in srgb, var(--basket-everyday) 5%, white)"
+        fill={JAR_GLASS}
         stroke="var(--muted)"
         strokeWidth="1.5"
       />
@@ -455,10 +459,10 @@ function HabitCard({
             style={
               joy
                 ? {
-                    background: "#fef3c7",
-                    borderColor: "#fcd34d",
+                    background: "var(--gold-soft)",
+                    borderColor: "var(--gold-line)",
                     color: GOLD_TEXT,
-                    boxShadow: "0 0 12px 2px rgba(250, 204, 21, 0.55)",
+                    boxShadow: "0 0 12px 2px color-mix(in srgb, var(--gold-line) 55%, transparent)",
                   }
                 : { borderColor: "var(--line)", color: GOLD_TEXT }
             }

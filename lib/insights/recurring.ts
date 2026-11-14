@@ -15,7 +15,7 @@
  * NOTE: the synthetic dataset seems to have few or no true subscriptions —
  * bills, savings and habits are what show up.
  */
-import type { ChartRow, Transaction } from "@/lib/types";
+import type { ChartRow, Transaction, UpcomingPayment } from "@/lib/types";
 import {
   categoryKind,
   getDataToday,
@@ -24,7 +24,10 @@ import {
   merchantType,
   round2,
 } from "@/lib/data";
-import { addDays } from "@/lib/data/dates";
+import { addDays, endOfMonth, toDate } from "@/lib/data/dates";
+
+/** "Restaurant MRC-RES-0068" / "Rent M-LANDLORD" → "Restaurant" / "Rent". */
+export const withoutMerchantId = (name: string) => name.replace(/ [A-Z]+(-[A-Z0-9]+)+$/, "");
 
 export type RecurringKind = "bill" | "subscription" | "automatic_saving" | "habit";
 
@@ -113,4 +116,41 @@ export function recurringPayments(): {
       value: i.perMonthEur,
     })),
   };
+}
+
+/**
+ * Bills, subscriptions and automatic savings expected in the next `days` days (Home tab).
+ * WHY "usual day of the month": the data has no due dates; each recurring payment's typical
+ * day (median of the last 12 months) is the best guess, the same one safe_to_spend relies on.
+ * Habits are left out: a favourite restaurant isn't a payment you must plan for.
+ */
+export function upcomingPayments(days = 31): UpcomingPayment[] {
+  const today = getDataToday();
+  const out: UpcomingPayment[] = [];
+  for (const i of recurringPayments().items) {
+    if (i.kind === "habit") continue;
+    const date = nextDayOfMonth(today, i.typicalDayOfMonth);
+    const inDays = Math.round((toDate(date).getTime() - toDate(today).getTime()) / 86_400_000);
+    if (inDays > days) continue;
+    out.push({
+      name: withoutMerchantId(i.name),
+      category: i.category,
+      kind: i.kind,
+      date,
+      inDays,
+      amountEur: i.averageAmountEur,
+    });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || b.amountEur - a.amountEur);
+}
+
+/** The next date after `today` that falls on `day` of the month (31 → the month's last day). */
+function nextDayOfMonth(today: string, day: number): string {
+  const inMonth = (monthStart: string) => {
+    const last = Number(endOfMonth(monthStart).slice(8, 10));
+    return `${monthStart.slice(0, 8)}${String(Math.min(day, last)).padStart(2, "0")}`;
+  };
+  const thisMonth = inMonth(`${today.slice(0, 7)}-01`);
+  if (thisMonth > today) return thisMonth;
+  return inMonth(addDays(endOfMonth(today), 1));
 }

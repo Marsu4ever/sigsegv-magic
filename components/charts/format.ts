@@ -21,6 +21,12 @@ export function shortLabel(label: string, monthly: boolean): string {
   return monthly ? `${Number(m[2])}/${m[1]}` : `${Number(m[3])}.${Number(m[2])}.`;
 }
 
+/** "2026-09-01" → "September" (month names in English, like the rest of the UI). */
+export function monthName(iso: string): string {
+  const [y, m] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleString("en-GB", { month: "long", timeZone: "UTC" });
+}
+
 /** "2026-09-23" → "23.9.2026" (Finnish style). */
 export function fiDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
