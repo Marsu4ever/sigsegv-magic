@@ -12,6 +12,7 @@
  *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
  *   4. spending breakdown    → /api/week      (the "Last 7 days" hero + podium; details on /week)
  *   5. upcoming payments     → /api/home      (recurring bills / savings, next month)
+ *   (set a goal line         → /api/goal      only when NO goal is set; GoalStartRow, quiet text)
  *   6. recent transactions   → /api/account   (latest few; everything on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
  * WHY each section loads on its own (own skeleton): a slow part doesn't hold up the rest.
@@ -22,7 +23,8 @@ import type { AccountSummary, Basket, HomeExtrasResponse, WeekSummary } from "@/
 import { AccountOverview } from "./AccountOverview";
 import { TransactionDayList } from "@/components/account/TransactionList";
 import { InsightCards } from "@/components/insights/InsightCards";
-import { GoalStrip } from "@/components/goal/GoalStrip";
+import { GoalStartRow, GoalStrip } from "@/components/goal/GoalStrip";
+import { useGoal } from "@/components/goal/api";
 import { Hero, TopCategories } from "@/components/week/WeekView";
 import { SafeToSpendCard } from "./SafeToSpendCard";
 import { UpcomingPayments } from "./UpcomingPayments";
@@ -90,6 +92,7 @@ export function HomeView() {
   const account = useJson<AccountSummary>("/api/account");
   const extras = useJson<HomeExtrasResponse>("/api/home");
   const week = useJson<WeekSummary>("/api/week");
+  const goal = useGoal().view;
   // The tapped type of expense in the spending breakdown (same behaviour as the Week page).
   const [focus, setFocus] = useState<Basket | null>(null);
   const toggle = (b: Basket) => setFocus(focus === b ? null : b);
@@ -134,7 +137,7 @@ export function HomeView() {
         )}
 
         {/* Saving goal: one line, only when a goal is set; taps through to /week (DECISIONS.md #53c) */}
-        <GoalStrip />
+        <GoalStrip view={goal} />
 
         {/* 3. Coach insights (hides itself when there's nothing to say) */}
         <InsightCards title="Coach insights" />
@@ -176,6 +179,9 @@ export function HomeView() {
             </SkeletonGroup>
           )}
         </Section>
+
+        {/* No goal yet: a quiet "Set a goal" line, low on purpose (DECISIONS.md #53c) */}
+        <GoalStartRow view={goal} />
 
         {/* 6. Recent transactions */}
         <Section title="Recent transactions" link={{ href: "/activity", label: "See all" }}>

@@ -22,7 +22,7 @@ import { chatCompletion, LlmError, type LlmMessage } from "./llm";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, runTool } from "./tools";
-import { mockReply } from "./mock";
+import { goalDraftText, mockReply } from "./mock";
 import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
@@ -176,6 +176,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
   let forceTool = false;
   let whatIf: WhatIf | undefined; // the last what_if_spending result opens the what-if view
   let goalDraft: GoalDraft | undefined; // the last plan_goal result → "Save goal" card
+  let emptyRetried = false; // asked once again after an empty final answer
 
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     console.log(`[ai] round ${round}: asking LLM…`);
@@ -257,14 +258,33 @@ export async function runChat(history: ChatMessage[]): Promise<{
       console.log(
         `[ai] round ${round}: final answer in ${ms(start)} (${(msg.content ?? "").length} chars)`,
       );
-      if (!msg.content) console.warn("[ai] warning: final answer is empty");
       // Goal safety net (same idea as fallbackCharts): a "save X for Y" question answered
       // without plan_goal still gets the Save card from the mock's parse (real tool, real numbers).
       if (!goalDraft) {
         const g = fallbackGoal(history);
         if (g) {
           goalDraft = g.goalDraft;
-          if (!text.trim()) text = g.text;
+          if (!splitFollowUp(text).body.trim()) text = g.text;
+        }
+      }
+      // Empty answer → never an empty bubble. WHY: Qwen answered "300 e for iphone 13" (after
+      // "what are you saving for?") with no text at all. With a goal card, code writes the
+      // sentence from the draft; otherwise ask the model once more, then a fixed sentence.
+      if (!splitFollowUp(text).body.trim()) {
+        if (goalDraft) {
+          console.warn("[ai] warning: final answer is empty — wrote the goal sentence from the draft");
+          text = goalDraftText(goalDraft);
+        } else if (!emptyRetried) {
+          emptyRetried = true;
+          console.warn(`[ai] round ${round}: empty answer — asking again`);
+          messages.push(msg, {
+            role: "user",
+            content: "[App check, not from the user] Your reply was empty. Answer the user's last message now.",
+          });
+          continue;
+        } else {
+          console.warn("[ai] warning: final answer is empty again — fixed sentence");
+          text = "Sorry, I didn't catch that. Could you say it another way?";
         }
       }
       // WHY a fixed offer with a goal card: the model kept offering "Save for my trip", which

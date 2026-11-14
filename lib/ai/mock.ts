@@ -103,9 +103,22 @@ function parseGoal(text: string, today: string): { name: string; amount_eur: num
   const name =
     text
       .match(/\bfor (?:a |an |the |my )?(.+?)(?= by\b| in\b|[.?!]|$)/i)?.[1]
-      ?.replace(/\d[\d\s]*(k\b|€|eur\w*)?/g, "")
+      // WHY only money amounts: "iphone 13" must keep its 13.
+      ?.replace(/\d[\d\s]*(?:[.,]\d+)?\s*(?:k\b|€|eur\w*|e\b)/gi, "")
       .trim() ?? "";
   return { name: name ? name[0].toUpperCase() + name.slice(1) : "My goal", amount_eur: amount, by_date: by };
+}
+
+/**
+ * The reply under a "Save goal" card, written by code from the draft (lib/goals numbers).
+ * Used by the mock and by chat.ts when the real model leaves the text empty.
+ */
+export function goalDraftText(d: GoalDraft): string {
+  const kept =
+    d.typicalKeptPerWeekEur !== null && d.typicalKeptPerWeekEur > 0
+      ? ` You usually keep about ${plus(d.typicalKeptPerWeekEur)} a week${d.stretch ? ", so this is a stretch" : ""}.`
+      : "";
+  return `That's about ${plus(d.weeklyNeededEur)} a week for ${d.weeksLeft} weeks.${kept} Save it below and I'll suggest one small mission a week.`;
 }
 
 /** Short "yes"-style answers, English and Finnish. */
@@ -152,8 +165,14 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
       : " Pick this week's mission on the This week page (tap the goal on Home).";
     return replyText(`${g.name}: ${plus(g.savedEur)} of ${eur0(g.targetEur)} saved, ${plus(g.weeklyNeededEur)} a week gets you there.${mission}`);
   }
+  // WHY the follow-up check: after "What are you saving for, how much?" the user answers
+  // "300 e for iphone 13" without the word "save" (an empty bubble in testing).
+  const prevAsked = history.findLast((m, i) => m.role === "assistant" && i < history.length - 1)?.text ?? "";
+  // Only an answer (a number, not a new question) to a reply that asked about a goal.
+  const goalAnswer =
+    /\b(sav(e|ing) for|goal)\b[^?]*\?/i.test(prevAsked) && /\d/.test(q) && !q.includes("?");
   // WHY a regex: "save 1000 for a trip" has words between "save" and "for".
-  if (/\b(save|saving)\b.*\bfor\b/.test(q) || has(q, "savings goal", "saving goal", "set a goal")) {
+  if (goalAnswer || /\b(save|saving)\b.*\bfor\b/.test(q) || has(q, "savings goal", "saving goal", "set a goal")) {
     const today = data("goal_status").missionWeek.today as string;
     const args = parseGoal(history.at(-1)?.text ?? "", today);
     if (!args) {
@@ -162,13 +181,9 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const result = runTool("plan_goal", args);
     const d = JSON.parse(result.content) as GoalDraft;
     if (d.error) return replyText(d.error);
-    const kept =
-      d.typicalKeptPerWeekEur !== null && d.typicalKeptPerWeekEur > 0
-        ? ` You usually keep about ${plus(d.typicalKeptPerWeekEur)} a week${d.stretch ? ", so this is a stretch" : ""}.`
-        : "";
     return {
       role: "assistant",
-      text: `[mock AI] That's about ${plus(d.weeklyNeededEur)} a week for ${d.weeksLeft} weeks.${kept} Save it below and I'll suggest one small mission a week.`,
+      text: `[mock AI] ${goalDraftText(d)}`,
       charts: [],
       goalDraft: result.goalDraft,
     };

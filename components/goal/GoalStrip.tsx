@@ -7,16 +7,16 @@
  * Only shown when a goal is set.
  */
 import Link from "next/link";
+import type { GoalView } from "@/lib/types";
 import { Icon } from "@/components/ui/Icon";
-import { eur0, useGoal } from "./api";
+import { eur0 } from "./api";
 
-export function GoalStrip() {
-  const { view } = useGoal();
+/** `view` from useGoal() in the page, shared with GoalStartRow (one GET /api/goal). */
+export function GoalStrip({ view }: { view: GoalView | null }) {
   if (!view) return null; // no skeleton: it's one line, and it shouldn't push the page around twice
 
   const g = view.goal;
-  // WHY nothing without a goal (team call): Home stays calm; people start a goal from the
-  // coach, the "Help to save" insight or the This week page.
+  // Without a goal: GoalStartRow, lower on Home (DECISIONS.md #53c).
   if (!g) return null;
 
   const m = view.mission;
@@ -56,6 +56,27 @@ export function GoalStrip() {
         </div>
         <Icon name="chevron" size={16} className="text-muted" />
       </div>
+    </Link>
+  );
+}
+
+/**
+ * A quiet "Set a goal" line on Home when there is no goal. Opens the setup sheet on /week.
+ * WHY plain text, low on the page (not a card up top): it should be findable, but Home's
+ * main job is balance and safe to spend (DECISIONS.md #53c).
+ */
+export function GoalStartRow({ view }: { view: GoalView | null }) {
+  if (!view || view.goal) return null;
+  return (
+    <Link
+      href="/week?setup=1"
+      className="flex min-h-11 items-center gap-2 px-1 text-sm text-muted"
+    >
+      <span aria-hidden>🎯</span>
+      <span className="flex-1">
+        Saving for something? <span className="font-medium text-accent">Set a goal</span>
+      </span>
+      <Icon name="chevron" size={16} />
     </Link>
   );
 }
