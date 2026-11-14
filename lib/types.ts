@@ -309,6 +309,60 @@ export type DaySpending = {
   }[];
 };
 
+// ─── Proactive insights ──────────────────────────────────────────────────
+// Added (new types only). Things the coach noticed without being asked:
+// spending alerts, recurring payments, unusual activity. Built by
+// lib/insights/proactive.ts; shown on the Account tab and given to the AI.
+
+export type InsightKind = "save_help" | "spending_alert" | "recurring" | "unusual";
+
+export type Insight = {
+  id: string; // stable per rule, e.g. "spending-alert"
+  kind: InsightKind;
+  title: string; // "Your grocery spending increased"
+  /** What was noticed. Amounts use the money markers {+…} / {-…} (components/chat/MoneyText). */
+  detail: string;
+  /** Why it was noticed: the comparison behind it, in plain words. */
+  why: string;
+  /** What the customer could do about it. */
+  action: string;
+  /** Optional list, e.g. recurring payments per month. */
+  table?: ChartRow[];
+  /** Optional total under the list, e.g. "Potential annual cost". */
+  total?: { label: string; value: number };
+  /** A question that opens the coach about this insight. */
+  ask: string;
+};
+
+/** GET /api/insights response body. */
+export type InsightsResponse = { asOf: string; insights: Insight[] };
+
+// ─── Account (home) tab ──────────────────────────────────────────────────
+// Added (new types only). The bank-app style overview: balance, month in/out,
+// balance history and the transaction list. Built by lib/data/home.ts.
+
+/** One row in the Account tab's transaction list. */
+export type AccountTransaction = {
+  date: string; // "YYYY-MM-DD"
+  time: string; // "HH:MM" ("" if unknown)
+  category: string;
+  merchantType: string | null; // e.g. "Supermarket", from the MCC code
+  amountEur: number; // negative = money out
+  kind: "spending" | "income" | "savings_move";
+};
+
+/** GET /api/account?offset=N response body. */
+export type AccountSummary = {
+  accountId: string;
+  balanceEur: number; // after the latest transaction
+  asOf: string; // the latest day in the data ("today" in this app)
+  month: { range: DateRange; incomeEur: number; spendingEur: number };
+  balanceHistory: ChartRow[]; // end-of-day balance, last 90 days
+  lowest: { date: string; balanceEur: number } | null; // lowest point in balanceHistory
+  transactions: AccountTransaction[]; // newest first, one page
+  nextOffset: number | null; // for "Show more"; null when everything is shown
+};
+
 /** GET /api/week response body. */
 export type WeekSummary = {
   range: DateRange;

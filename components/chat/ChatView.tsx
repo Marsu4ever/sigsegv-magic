@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf } from "@/lib/types";
+import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf, InsightsResponse } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
 import { MessageBubble } from "./MessageBubble";
@@ -91,6 +91,22 @@ export function ChatView() {
   const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
   // The lightbulb next to the text box: suggested questions again, mid-conversation.
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  // WHY: someone who keeps little of their income may not know it. The coach says so
+  // first, before they ask (lib/insights/proactive.ts, "save_help").
+  const [opener, setOpener] = useState<ChatMessage | null>(null);
+  useEffect(() => {
+    fetch("/api/insights")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: InsightsResponse | null) => {
+        const help = json?.insights.find((i) => i.kind === "save_help");
+        if (!help) return;
+        setOpener({
+          role: "assistant",
+          text: `${help.title}. ${help.detail} Want to see how you could save?\n[[${help.ask}]]`,
+        });
+      })
+      .catch((err) => console.error("[insights]", err));
+  }, []);
 
   // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
   // On failure the chip is just left out — the other suggestions still work.
@@ -183,7 +199,10 @@ export function ChatView() {
 
   async function send(text: string) {
     setSuggestionsOpen(false);
-    const next: ChatMessage[] = [...messages, { role: "user", text }];
+    // WHY: the opener becomes part of the chat once the user answers, so the AI
+    // knows what it offered (and a typed "yes" works).
+    const base = messages.length === 0 && opener ? [opener] : messages;
+    const next: ChatMessage[] = [...base, { role: "user", text }];
     setMessages(next);
     setLoading(true);
     const controller = new AbortController();
@@ -267,6 +286,7 @@ export function ChatView() {
           // Welcome + suggestions as one tidy list (team call: the old centred
           // pill stack looked homemade).
           <div className="mx-auto max-w-md space-y-5 px-1 pt-6">
+            {opener && <MessageBubble message={opener} onFollowUp={send} />}
             <div className="flex flex-col items-center text-center">
               <LogoMark size={52} />
               <h2 className="mt-3 text-xl font-semibold">Hi! I&apos;m your money coach.</h2>

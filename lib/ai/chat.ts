@@ -24,6 +24,7 @@ import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, runTool } from "./tools";
 import { mockReply } from "./mock";
 import { noLongDashes } from "@/lib/noDashes";
+import { moneyHealthNote } from "@/lib/insights/proactive";
 
 const MAX_TOOL_ROUNDS = 6;
 /** Max time for ONE request to the LLM. */
@@ -109,6 +110,8 @@ export async function runChat(history: ChatMessage[]): Promise<{
         merchantTypes: allMerchantTypes(),
         age: getCustomer().age,
         whatIfDefault: getDefaultTarget().label,
+        // WHY: lets the coach help someone save before they ask (lib/insights/proactive.ts).
+        moneyNote: moneyHealthNote(),
       }),
     },
     // WHY only text from history: earlier charts are already on screen;
