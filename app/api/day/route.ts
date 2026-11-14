@@ -7,6 +7,15 @@ import type { DaySpending } from "@/lib/types";
 import { getTransactions, isIncome, isSpending, merchantType, round2, spentEur } from "@/lib/data";
 import { withPickedCustomer } from "@/lib/data/request";
 
+/**
+ * "26MAY26:14:57:12" (real data) or "2026-05-26T08:05:00" (mock data) → "14:57".
+ * WHY match the end: both formats end in HH:MM:SS.
+ */
+function hhmm(timestamp: string): string | null {
+  const m = timestamp.match(/(\d\d):(\d\d):\d\d$/);
+  return m ? `${m[1]}:${m[2]}` : null;
+}
+
 export async function GET(request: Request) {
   await connection();
   const date = new URL(request.url).searchParams.get("date") ?? "";
@@ -26,6 +35,7 @@ export async function GET(request: Request) {
         merchantType: merchantType(t.mccCode) ?? null,
         amountEur: round2(spentEur(t)),
         basket: t.basket,
+        time: hhmm(t.timestamp),
       }))
       .sort((a, b) => b.amountEur - a.amountEur),
   };
