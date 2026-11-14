@@ -416,8 +416,10 @@ body {
     transform: none;
   }
 }
+/* WHY backwards, not both: a finished animation that keeps its transform ("both") traps
+ * position:fixed children — the full-screen chart opened inside the bubble, half hidden (14 Nov). */
 .msg-in {
-  animation: msg-in 260ms ease-out both;
+  animation: msg-in 260ms ease-out backwards;
 }
 
 /* A saving ({+…} in a reply): one soft green glow after it has counted up. */

@@ -5,6 +5,7 @@
  * small screen, and it's more accessible (screen readers).
  */
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartTitle } from "./ChartTitle";
@@ -18,7 +19,10 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // WHY a portal to <body>: an ancestor with a transform (e.g. a chat reply's fade-in)
+  // turns "fixed" into "fixed to that ancestor", so the full screen was only as big as the
+  // reply: half hidden, jumping back up when scrolled (14 Nov). At <body> nothing can trap it.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex justify-center bg-black/40" onClick={onClose}>
       <div
         role="dialog"
@@ -61,6 +65,7 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
             )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -52,15 +52,26 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
   const v = spec.leaks;
   // Habits the user chose to "skip one" of (full screen).
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
-  // Is the big jar on screen? (If not, a mini jar follows you down the list.)
+  // Has the habit list reached the top of the screen? Then a mini jar follows you down it.
+  // WHY watch the list's top (a zero-height marker), not the big jar: the big jar left the
+  // screen before the list reached the top, so the mini jar popped up mid-screen over a card
+  // and looked stuck there until you scrolled further (14 Nov).
   const bigJar = useRef<HTMLDivElement>(null);
+  const listTop = useRef<HTMLDivElement>(null);
   const [bigJarVisible, setBigJarVisible] = useState(true);
   useEffect(() => {
-    const el = bigJar.current;
+    const el = listTop.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => setBigJarVisible(e.isIntersecting), {
-      threshold: 0.15,
-    });
+    // The scrolling full-screen panel (or the page, if there is none).
+    const root = el.parentElement?.closest<HTMLElement>(".overflow-y-auto") ?? null;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        const top = e.rootBounds?.top ?? 0;
+        // Scrolled past the list's top (it's above the panel's top edge) → show the mini jar.
+        setBigJarVisible(e.isIntersecting || e.boundingClientRect.top > top);
+      },
+      { root, rootMargin: "-8px 0px 0px 0px" },
+    );
     io.observe(el);
     return () => io.disconnect();
   }, [v]);
@@ -172,8 +183,11 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
             off screen — top-right corner, big enough to see marbles change.
             WHY sticky with zero height: it floats over the cards without taking
             any space (no layout jump). Pops in with a little overshoot. */}
+        {/* Marker for the list's top edge (see listTop above). */}
+        {!compact && <div ref={listTop} aria-hidden className="h-0" />}
         {!compact && (
-          <div className="pointer-events-none sticky top-2 z-10 h-0">
+          // WHY marginTop 0: the list's space-y gap would otherwise add 8 px under the marker.
+          <div className="pointer-events-none sticky top-2 z-10 h-0" style={{ marginTop: 0 }}>
             <div
               className="absolute right-0 top-0 origin-top-right rounded-2xl border border-line bg-surface p-2 shadow-lg"
               style={{
