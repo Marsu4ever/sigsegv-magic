@@ -18,7 +18,7 @@ export function DevPage({
       <header className="sticky top-0 z-10 border-b border-line bg-surface px-4 py-3">
         <div className="flex items-center justify-between">
           <h1 className="font-semibold">{title}</h1>
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-muted">team page</span>
+          <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted">team page</span>
         </div>
         <nav className="mt-1 flex gap-3 text-xs text-accent">
           <Link href="/dev">Team hub</Link>
@@ -53,5 +53,5 @@ export function Section({
 }
 
 export function Code({ children }: { children: React.ReactNode }) {
-  return <code className="rounded bg-gray-100 px-1 py-0.5 text-[12px]">{children}</code>;
+  return <code className="rounded bg-background px-1 py-0.5 text-[12px]">{children}</code>;
 }

@@ -51,7 +51,7 @@ function StatusCard({ m }: { m: MortgageSummary }) {
     <Card>
       <span
         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-          approved ? "bg-accent/10 text-accent" : "bg-red-50 text-red-700"
+          approved ? "bg-accent/10 text-accent" : "bg-danger-soft text-danger"
         }`}
       >
         {approved ? "✓ Approved" : "✕ Not approved"}
@@ -63,11 +63,11 @@ function StatusCard({ m }: { m: MortgageSummary }) {
       </p>
 
       {!approved && (
-        <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm">
-          <p className="font-semibold text-red-800">
+        <div className="mt-3 rounded-lg bg-danger-soft p-3 text-sm">
+          <p className="font-semibold text-danger">
             {reason?.title ?? label({}, m.rejectionReason ?? "Reason not recorded")}
           </p>
-          {reason && <p className="mt-0.5 text-red-900/80">{reason.text}</p>}
+          {reason && <p className="mt-0.5 text-foreground/80">{reason.text}</p>}
         </div>
       )}
 
@@ -215,7 +215,7 @@ function TimelineCard({ m }: { m: MortgageSummary }) {
             <li key={i} className="relative pb-3 pl-4 last:pb-0">
               <span
                 className={`absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-surface ${
-                  isDecision ? (m.decision === "approved" ? "bg-accent" : "bg-red-600") : "bg-line"
+                  isDecision ? (m.decision === "approved" ? "bg-accent" : "bg-danger") : "bg-line"
                 }`}
               />
               <p className="text-[11px] text-muted">{fiDate(e.date)}</p>
@@ -276,7 +276,7 @@ export function MortgageView() {
       </header>
 
       <div className="space-y-4 p-4">
-        {error && <p className="text-sm text-red-600">⚠️ {error}</p>}
+        {error && <p className="text-sm text-danger">⚠️ {error}</p>}
         {data === undefined && !error && <p className="text-sm text-muted">Loading…</p>}
         {data === null && <NoMortgage />}
         {data && (

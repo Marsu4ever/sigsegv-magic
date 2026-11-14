@@ -123,7 +123,20 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   const tiltLabels =
     !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
   const height = compact ? 160 : 340;
-  const tooltip = <Tooltip formatter={(v) => formatValue(Number(v), spec.unit)} />;
+  // WHY styled: Recharts' default tooltip is a white box, which glares in dark mode.
+  const tooltip = (
+    <Tooltip
+      formatter={(v) => formatValue(Number(v), spec.unit)}
+      contentStyle={{
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 8,
+        color: "var(--foreground)",
+      }}
+      labelStyle={{ color: "var(--muted)" }}
+      cursor={{ fill: "var(--line)", fillOpacity: 0.5 }}
+    />
+  );
 
   return (
     <div>

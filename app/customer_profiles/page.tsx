@@ -54,7 +54,7 @@ function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
         </div>
         <div>
           <div className="text-muted">Keeps</div>
-          <span className={p.savingsRate < 0 ? "text-red-600" : ""}>{pct(p.savingsRate)}</span>
+          <span className={p.savingsRate < 0 ? "text-danger" : ""}>{pct(p.savingsRate)}</span>
         </div>
       </div>
 
@@ -76,7 +76,7 @@ function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
         <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span
             className={`rounded-full px-2 py-0.5 font-medium ${
-              p.mortgage.decision === "approved" ? "bg-accent/10 text-accent" : "bg-red-50 text-red-700"
+              p.mortgage.decision === "approved" ? "bg-accent/10 text-accent" : "bg-danger-soft text-danger"
             }`}
           >
             🏠 Home loan {p.mortgage.decision}
