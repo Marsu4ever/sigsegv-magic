@@ -6,7 +6,7 @@
  * ⚠️ The type labels are OUR rough rules (thresholds below), meant to help
  * the team find interesting customers — not financial science. Change freely.
  */
-import type { Basket } from "@/lib/types";
+import type { Basket, MortgageDecision } from "@/lib/types";
 import { BASKETS } from "@/lib/types";
 import { isSpending, listDemoCustomerIds, loadCustomerFile, spentEur } from "./index";
 
@@ -48,6 +48,14 @@ export type CustomerProfile = {
   basketShare: Record<Basket, number>; // share of spending, sums to ~1
   topEveryday: string; // biggest category in the everyday basket
   type: SpendingType;
+  /** Set if the customer applied for a home loan (see lib/data/mortgage.ts). */
+  mortgage: {
+    id: string;
+    decision: MortgageDecision;
+    rejectionReason: string | null;
+    /** true = salary is moved out right away, so very little spending shows here */
+    salarySweep: boolean;
+  } | null;
 };
 
 function monthsBetween(a: string, b: string): number {
@@ -57,7 +65,7 @@ function monthsBetween(a: string, b: string): number {
 }
 
 export function profileFor(id: string): CustomerProfile | null {
-  const { customer, transactions: t } = loadCustomerFile(id);
+  const { customer, mortgage, transactions: t } = loadCustomerFile(id);
   if (t.length === 0) return null;
   const months = monthsBetween(t[0].date, t[t.length - 1].date);
 
@@ -105,6 +113,12 @@ export function profileFor(id: string): CustomerProfile | null {
     basketShare: share,
     topEveryday: [...everydayCats].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "–",
     type,
+    mortgage: mortgage && {
+      id: mortgage.mortgageId,
+      decision: mortgage.decision,
+      rejectionReason: mortgage.rejectionReason,
+      salarySweep: t.some((x) => x.category === "Salary Sweep"),
+    },
   };
 }
 

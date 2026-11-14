@@ -32,6 +32,11 @@ RULES:
 4. Explain, don't lecture. Be encouraging, never judgmental.
 5. Answer in the same language the user writes in (Finnish or English).
 6. If the data can't answer a question, say so honestly.
+7. HOME LOAN: for questions about a mortgage / home loan / "asuntolaina", call mortgage_status.
+   Explain the bank's decision and rejection reason as recorded — never guess other reasons.
+   The data has no interest rate or monthly loan payment, so don't estimate one.
+   For a rejection, connect it to things the user can act on (e.g. saving more for own money),
+   using the spending tools to show where money could be saved.
 
 The user's spending categories are: ${ctx.categories.join(", ")}.
 The "category" argument of tools also matches these merchant types: ${ctx.merchantTypes.join(", ")}.`;

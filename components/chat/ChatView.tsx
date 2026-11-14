@@ -94,6 +94,20 @@ export function ChatView() {
     }
   }
 
+  // A question handed over from another tab, e.g. /chat?ask=… from the Home loan tab.
+  useEffect(() => {
+    const ask = new URLSearchParams(window.location.search).get("ask");
+    if (!ask) return;
+    // WHY a timer + cleanup: React dev mode runs effects twice; the first timer
+    // is cancelled, so the question is asked exactly once.
+    const id = setTimeout(() => {
+      window.history.replaceState(null, "", "/chat"); // a reload shouldn't ask again
+      send(ask);
+    }, 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on open
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">

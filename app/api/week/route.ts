@@ -4,13 +4,14 @@
  */
 import { connection } from "next/server";
 import { getWeekSummary } from "@/lib/data";
+import { withPickedCustomer } from "@/lib/data/request";
 
 export async function GET() {
   // WHY connection(): tells Next.js to compute this on every request instead
   // of freezing the result at build time, so data changes show up.
   await connection();
   try {
-    return Response.json(getWeekSummary());
+    return Response.json(await withPickedCustomer(getWeekSummary));
   } catch (err) {
     console.error("[api/week]", err);
     const detail = err instanceof Error ? err.message : String(err);

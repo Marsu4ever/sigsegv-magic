@@ -23,7 +23,13 @@ import {
 import { loadCustomerData } from "./load";
 import { merchantType } from "./merchantTypes";
 
-export { getCustomerId, listDemoCustomerIds, loadCustomerFile, getDatasetCategories } from "./load";
+export {
+  getCustomerId,
+  getDefaultCustomerId,
+  listDemoCustomerIds,
+  loadCustomerFile,
+  getDatasetCategories,
+} from "./load";
 export { PERIODS, type Period } from "./dates";
 export { allMerchantTypes, merchantType } from "./merchantTypes";
 

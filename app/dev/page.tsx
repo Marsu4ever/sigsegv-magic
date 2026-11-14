@@ -8,6 +8,7 @@ import { getCustomerId } from "@/lib/data";
 import { listDataFiles } from "@/lib/data/files";
 import { getAiConfig } from "@/lib/ai/config";
 import { Code, DevPage, Section } from "@/components/dev/DevPage";
+import { ForPickedCustomer } from "@/components/dev/ForPickedCustomer";
 
 const PAGES = [
   {
@@ -37,6 +38,10 @@ const WHO_OWNS_WHAT = [
 const viewUrl = (p: string) => `/api/data-file?path=${encodeURIComponent(p)}`;
 
 export default function DevHub() {
+  return <ForPickedCustomer render={DevHubBody} />;
+}
+
+function DevHubBody() {
   const ai = getAiConfig();
   const files = listDataFiles();
   const current = getCustomerId();
@@ -66,8 +71,9 @@ export default function DevHub() {
             AI: <Code>{ai.mode === "mock" ? "mock (no real AI)" : ai.model}</Code>
           </li>
           <li className="text-xs text-muted">
-            Both are set in <Code>.env.local</Code> — restart <Code>npm run dev</Code> after
-            changing it.
+            Switch customer with the dark <b>DEMO</b> bar at the top (per device; the default is{" "}
+            <Code>DEMO_CUSTOMER_ID</Code> in <Code>.env.local</Code>). AI settings are in{" "}
+            <Code>.env.local</Code>.
           </li>
         </ul>
       </Section>

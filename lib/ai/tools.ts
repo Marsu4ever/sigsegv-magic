@@ -10,6 +10,9 @@
  * WHY: the AI never does math on raw transactions. Numbers come from tested
  * code in lib/data, so the coach is trustworthy.
  *
+ * mortgage_status: the customer's home loan application (lib/data/mortgage.ts).
+ * Returns { hasMortgage: false } for customers who never applied.
+ *
  * TO ADD A TOOL (e.g. whatIf, safeToSpend later):
  *   - write the function in lib/data or lib/insights
  *   - add a definition to TOOL_DEFINITIONS
@@ -27,6 +30,7 @@ import {
   spendOverTime,
   type Period,
 } from "@/lib/data";
+import { getMortgageSummary } from "@/lib/data/mortgage";
 
 // ─── Shared argument schema pieces ───────────────────────────────────────
 
@@ -45,6 +49,7 @@ const DATA_TOOL_NAMES = [
   "basket_breakdown",
   "spend_over_time",
   "list_transactions",
+  "mortgage_financing",
 ] as const;
 type DataToolName = (typeof DATA_TOOL_NAMES)[number];
 
@@ -115,6 +120,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "mortgage_status",
+      description:
+        "The user's home loan (mortgage) application: the bank's decision and rejection reason, property, loan, " +
+        "own money (equity), loan-to-value, collateral, extra costs, required monthly income, the user's average " +
+        "monthly income and spending (last 12 months), and a timeline. Returns hasMortgage=false if they never applied.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "show_chart",
       description:
         "Show the user a chart or table in the chat. You choose the chart type, title and which data tool + arguments " +
@@ -126,7 +142,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           title: { type: "string" },
           data_tool: {
             type: "string",
-            enum: ["spend_by_category", "basket_breakdown", "spend_over_time"],
+            enum: ["spend_by_category", "basket_breakdown", "spend_over_time", "mortgage_financing"],
+            description: "mortgage_financing = loan vs. own money for the home (needs no period).",
           },
           data_args: {
             type: "object",
@@ -196,6 +213,19 @@ function runDataTool(name: DataToolName, args: Args) {
       const groupBy = g === "day" || g === "week" || g === "month" ? g : "week";
       return { range, rows: spendOverTime(range, groupBy, optString(args.category)) };
     }
+    case "mortgage_financing": {
+      // WHY here: lets show_chart draw the home loan split with exact numbers.
+      const m = getMortgageSummary();
+      return {
+        range,
+        rows: m
+          ? [
+              { label: "Loan", value: m.loanEur },
+              { label: "Own money", value: m.equityEur },
+            ]
+          : [],
+      };
+    }
     case "list_transactions": {
       const basket = BASKETS.includes(args.basket as Basket) ? (args.basket as Basket) : undefined;
       const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 30);
@@ -214,7 +244,24 @@ function runDataTool(name: DataToolName, args: Args) {
   }
 }
 
+/** The mortgage summary, trimmed for the LLM (fewer tokens, no long notes). */
+function mortgageStatus() {
+  const m = getMortgageSummary();
+  if (!m) return { hasMortgage: false };
+  return {
+    hasMortgage: true,
+    ...m,
+    // WHY: the bank's verdict is final data; the AI must not invent its own (see prompt).
+    note: "decision and rejectionReason are the bank's own record. requiredMonthlyIncomeEur is the bank's figure.",
+    // undefined fields are dropped by JSON.stringify
+    timeline: m.timeline.map((e) => ({ ...e, note: undefined, time: undefined })),
+  };
+}
+
 export function runTool(name: string, args: Args): ToolResult {
+  if (name === "mortgage_status") {
+    return { content: JSON.stringify(mortgageStatus()) };
+  }
   if ((DATA_TOOL_NAMES as readonly string[]).includes(name)) {
     return { content: JSON.stringify(runDataTool(name as DataToolName, args)) };
   }

@@ -7,12 +7,13 @@
  * - the app only ever shows ONE person's data ("chat with your own money")
  * scripts/prepare-data.mjs creates these files from the raw CSV.
  *
- * Which customer the app shows: DEMO_CUSTOMER_ID in .env.local.
- * "MOCK" (fake data, generated) is the fallback if it's not set.
+ * Which customer the app shows: the one picked in the app (cookie, see lib/demoCustomer.ts),
+ * else DEMO_CUSTOMER_ID in .env.local, else "MOCK" (fake data, generated).
  */
+import { AsyncLocalStorage } from "node:async_hooks";
 import fs from "node:fs";
 import path from "node:path";
-import type { Customer, Transaction } from "@/lib/types";
+import type { Customer, Mortgage, Transaction } from "@/lib/types";
 import { classifyBasket } from "./baskets";
 
 const DEMO_DIR = path.join(process.cwd(), "data", "demo");
@@ -20,18 +21,39 @@ const DEMO_DIR = path.join(process.cwd(), "data", "demo");
 /** Shape of data/demo/<id>.json, written by scripts/prepare-data.mjs. */
 type DemoFile = {
   customer: Customer;
+  mortgage?: Mortgage; // only for customers who applied for a home loan
   transactions: Omit<Transaction, "basket">[];
 };
 
 export type CustomerData = {
   customer: Customer;
+  mortgage: Mortgage | null;
   transactions: Transaction[]; // sorted by date, oldest first
 };
 
 const cache = new Map<string, CustomerData>();
 
-export function getCustomerId(): string {
+/**
+ * The customer picked in the app, for the current request only.
+ * WHY AsyncLocalStorage: every data function finds "the current customer" through
+ * getCustomerId(). The pick lives in a cookie, which only route handlers and pages can
+ * read. They wrap their work in withCustomer(id, …) (via lib/data/request.ts) and
+ * getCustomerId() finds it here — per request, so two devices never mix customers.
+ */
+const requestCustomer = new AsyncLocalStorage<string>();
+
+/** Run `fn` with `id` as the current customer (undefined = the default). */
+export function withCustomer<T>(id: string | undefined, fn: () => T): T {
+  return id ? requestCustomer.run(id, fn) : fn();
+}
+
+/** The default customer when nothing is picked in the app. */
+export function getDefaultCustomerId(): string {
   return process.env.DEMO_CUSTOMER_ID || "MOCK";
+}
+
+export function getCustomerId(): string {
+  return requestCustomer.getStore() ?? getDefaultCustomerId();
 }
 
 /** All customer ids that have a file in data/demo/ (MOCK last). */
@@ -65,7 +87,7 @@ export function loadCustomerFile(id: string): CustomerData {
     .map((t) => ({ ...t, basket: classifyBasket(t.category, t.mccCode) }))
     .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
 
-  const data = { customer: raw.customer, transactions };
+  const data = { customer: raw.customer, mortgage: raw.mortgage ?? null, transactions };
   cache.set(id, data);
   return data;
 }

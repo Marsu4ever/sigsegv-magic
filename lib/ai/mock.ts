@@ -9,6 +9,7 @@
  */
 import type { ChartSpec, ChatMessage } from "@/lib/types";
 import { allMerchantTypes, listCategories } from "@/lib/data";
+import { getMortgageSummary } from "@/lib/data/mortgage";
 import { runTool } from "./tools";
 
 function chart(args: Record<string, unknown>): ChartSpec | undefined {
@@ -27,6 +28,29 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     text: `[mock AI] ${text}`,
     charts: c ? [c] : [],
   });
+
+  // WHY before the category match: "home loan" would otherwise match the "Home & Tech" category.
+  if (/mortgage|home loan|loan|laina/.test(q)) {
+    const m = getMortgageSummary();
+    if (!m) {
+      return reply("You don't have a home loan application. Want to see how much you could save each month?");
+    }
+    const c = chart({
+      chart_type: "pie",
+      title: "How the home is paid for",
+      data_tool: "mortgage_financing",
+      data_args: { period: "all" },
+    });
+    const eur = (n: number) => `€${Math.round(n).toLocaleString("en")}`;
+    return reply(
+      m.decision === "approved"
+        ? `Your home loan of ${eur(m.loanEur)} was approved on ${m.decidedOn}. ` +
+            `You're paying ${eur(m.equityEur)} of the ${eur(m.property.priceEur)} price with your own money.`
+        : `Your home loan application was rejected on ${m.decidedOn}. The bank's reason: ${(m.rejectionReason ?? "not recorded").replace(/_/g, " ")}. ` +
+            `You applied for ${eur(m.loanEur)} with ${eur(m.equityEur)} of your own money.`,
+      c,
+    );
+  }
 
   if (q.includes("basket")) {
     const c = chart({
@@ -78,6 +102,6 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
 
   return reply(
     'I\'m a placeholder until the real AI is connected. Try: "my baskets", "this week", ' +
-      '"spending trend", or a category name like "taxi".',
+      '"spending trend", "my home loan", or a category name like "taxi".',
   );
 }
