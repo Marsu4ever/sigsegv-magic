@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-// WHY: like a banking app, the app opens on the account overview (balance and
-// transactions); the coach is one tap away (Chat tab, or the questions on that page).
+// WHY: like a banking app, the app opens on the Home dashboard (balance, what's safe to
+// spend, what's coming); the coach is one tap away (Coach tab, or the insights on Home).
 export default function Home() {
-  redirect("/account");
+  redirect("/home");
 }

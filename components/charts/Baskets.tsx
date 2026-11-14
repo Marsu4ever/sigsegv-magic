@@ -176,7 +176,7 @@ function StackedBar({
         <div className="relative mb-1 h-6">
           {label && (
             <span
-              className="absolute top-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-white shadow-sm"
+              className="absolute top-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold text-background shadow-sm"
               style={{
                 background: label.color,
                 // Centred over the piece, but kept inside the screen at the ends.

@@ -22,6 +22,7 @@ import { CountUp } from "@/components/ui/CountUp";
 import { EmptyChart } from "@/components/charts/EmptyChart";
 import { ProjectionChart } from "@/components/charts/ProjectionChart";
 import { PurchaseList } from "@/components/whatif/PurchaseList";
+import { Icon } from "@/components/ui/Icon";
 import { EstimateInfo } from "@/components/whatif/EstimateInfo";
 import { InfoTip } from "@/components/ui/InfoTip";
 import { averageBasisText, formatValue } from "@/components/charts/format";
@@ -153,9 +154,9 @@ export function WhatIfPanel({
           type="button"
           onClick={onClose}
           aria-label="Close what-if view"
-          className="-mr-1 h-9 w-9 shrink-0 rounded-full text-muted"
+          className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
         >
-          ✕
+          <Icon name="close" size={20} />
         </button>
       </div>
 

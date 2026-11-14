@@ -366,10 +366,28 @@ export type AccountTransaction = {
 
 /** GET /api/account?month=YYYY-MM response body. */
 export type AccountSummary = {
-  accountId: string;
-  balanceEur: number; // after the latest transaction
+  /** null when the customer has no transactions at all (never shown as a made-up value). Changed 15 Nov. */
+  accountId: string | null;
+  /** After the latest transaction; null when there are no transactions. Changed 15 Nov (was 0). */
+  balanceEur: number | null;
   asOf: string; // the latest day in the data ("today" in this app)
-  month: { range: DateRange; incomeEur: number; spendingEur: number };
+  /**
+   * This month so far, from the transactions. net = income − spending (both as on the In / Out
+   * tiles; moves to the customer's own savings are neither, listed apart). Added 15 Nov: netEur,
+   * movedToSavingsEur.
+   */
+  month: {
+    range: DateRange;
+    incomeEur: number;
+    spendingEur: number;
+    netEur: number;
+    movedToSavingsEur: number;
+  };
+  /**
+   * The balance at the end of last month and how much it has changed since (for the up / down
+   * indicator). null when the history starts this month. Added 15 Nov.
+   */
+  previousMonth: { endDate: string; balanceEur: number; changeEur: number } | null;
   balanceHistory: ChartRow[]; // end-of-day balance, last 90 days
   lowest: { date: string; balanceEur: number } | null; // lowest point in balanceHistory
   /**
@@ -392,6 +410,38 @@ export type WeekSummary = {
   /** Basket of each top category (same order) — for colour-coding on the Week tab. */
   topCategoryBaskets: Basket[];
 };
+
+// ─── Home tab ────────────────────────────────────────────────────────────
+
+/**
+ * Safe to spend (lib/insights/safeToSpend.ts — the same function as the coach's
+ * safe_to_spend tool, so Home and the chat always agree). Added 14 Nov.
+ */
+export type SafeToSpendSummary = {
+  today: string;
+  nextPayday: string | null; // null = no salary rhythm found (then 30 days are used)
+  daysToPayday: number;
+  balanceEur: number;
+  fixedCostsBeforePaydayEur: number; // bills + savings expected before payday (estimate)
+  surpriseBufferEur: number; // average irregular costs for those days
+  safeUntilPaydayEur: number;
+  safePerDayEur: number;
+  requestedDays: number;
+  safeForRequestedDaysEur: number;
+};
+
+/** A bill, subscription or automatic saving expected soon (from recurring payments). Added 14 Nov. */
+export type UpcomingPayment = {
+  name: string; // "Housing", "Streaming"
+  category: string;
+  kind: "bill" | "subscription" | "automatic_saving";
+  date: string; // expected date: its usual day of the month, next time it comes round
+  inDays: number;
+  amountEur: number; // its usual amount (positive)
+};
+
+/** GET /api/home — the Home tab parts no other endpoint has. Added 14 Nov. */
+export type HomeExtrasResponse = { safeToSpend: SafeToSpendSummary; upcoming: UpcomingPayment[] };
 
 // ─── What-if / forecast ──────────────────────────────────────────────────
 

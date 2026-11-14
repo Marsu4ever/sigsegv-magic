@@ -27,7 +27,7 @@ import {
   spentEur,
 } from "@/lib/data";
 import { addDays, endOfMonth, startOfMonth, toDate } from "@/lib/data/dates";
-import { recurringPayments } from "./recurring";
+import { recurringPayments, withoutMerchantId } from "./recurring";
 
 // ─── Small helpers ───────────────────────────────────────────────────────
 
@@ -60,9 +60,6 @@ const isWeekend = (iso: string) => [0, 6].includes(toDate(iso).getUTCDay());
 /** "Groceries" → "grocery" (as in "grocery spending"); other categories just lowercased. */
 const NOUN: Record<string, string> = { groceries: "grocery", restaurants: "restaurant" };
 const noun = (category: string) => NOUN[category.toLowerCase()] ?? category.toLowerCase();
-
-/** "Restaurant MRC-RES-0068" / "Rent M-LANDLORD" → "Restaurant" / "Rent". */
-const withoutMerchantId = (name: string) => name.replace(/ [A-Z]+(-[A-Z0-9]+)+$/, "");
 
 /** Bills (rent, utilities…) aren't something to budget weekly: alerts use purchases only. */
 const isPurchase = (t: Transaction) => isSpending(t) && t.transactionType === "purchase";
