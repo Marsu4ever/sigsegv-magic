@@ -222,7 +222,8 @@ export function WhatIfPanel({
         />
       )}
 
-      {/* The result for the picked %: the saving big; tap it to see the totals (before → after).
+      {/* The result for the picked %: the saving big; tap it to see the totals for the period
+          (as now → with the cut, labelled under each number).
           WHY hidden by default: the saving is the message, the totals are detail. */}
       {/* WHY dimmed (not hidden) while loading: hiding it made everything below jump. */}
       {!error && shown.status !== "not_enough_data" && (
@@ -265,11 +266,18 @@ export function WhatIfPanel({
               showTotals ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
             }`}
           >
-            <p className="overflow-hidden text-sm text-muted">
-              <span className="block pt-1">
-                {formatValue(shown.noChangeEur, "€")} → {formatValue(shown.withCutEur, "€")}
-              </span>
-            </p>
+            <div className="overflow-hidden text-sm text-muted">
+              {/* WHY a 3-column grid: the labels sit centred under their numbers and the arrow
+                  stays on the numbers' line. Labels match the chart's ("As now" / "10% less"). */}
+              <div className="inline-grid grid-cols-[auto_auto_auto] items-center gap-x-8 pt-1">
+                <span>{formatValue(shown.noChangeEur, "€")}</span>
+                <span aria-hidden>→</span>
+                <span>{formatValue(shown.withCutEur, "€")}</span>
+                <span className="text-xs">As now</span>
+                <span />
+                <span className="text-xs">{shown.cutPct}% less</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
