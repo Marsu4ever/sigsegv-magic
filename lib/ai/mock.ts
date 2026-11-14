@@ -44,8 +44,8 @@ const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
 
 /**
  * Words that open the what-if view (what_if_spending).
- * WHY "save if" / "reduce" are not here: they still reach the older what_if sub-tool below
- * (per-month / per-year saving), so both can be tried in mock mode.
+ * WHY "save if" / "reduce" / "skip" are not here: they reach what_if below (a habit's saving
+ * as bars for 1 / 3 / 6 months), so both what-if tools can be tried in mock mode.
  */
 const WHAT_IF_WORDS = ["what if", "spend less", "cut", "forecast", "predict", "keep spending"];
 
@@ -204,17 +204,21 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     );
   }
 
-  if (has(q, "what if", "save if", "cut", "reduce")) {
+  if (has(q, "what if", "save if", "cut", "reduce", "skip")) {
     const pct = Number(q.match(/(\d+)\s*%/)?.[1] ?? 20);
     const args = {
       change_percent: -pct,
       category: category ?? "restaurants",
       period: "last_90_days",
     };
-    const w = data("what_if", args);
+    // WHY runTool, not chart(): what_if draws its own bar chart (as now vs after, 1 / 3 / 6 months).
+    const r = runTool("what_if", args);
+    const w = JSON.parse(r.content);
+    const six = w.periods.at(-1);
     return reply(
-      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month, ${plus(w.savingPerYearEur)} a year.`,
-      chart("bar", `${w.what}: now vs after −${pct}%`, "what_if", args),
+      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month, ` +
+        `${plus(six.savingEur)} over 6 months.`,
+      r.chart,
     );
   }
 

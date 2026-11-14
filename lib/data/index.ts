@@ -89,6 +89,17 @@ export function getDataFirstDay(): string {
   return txs.length ? txs[0].date : getDataToday();
 }
 
+/**
+ * The range, starting no earlier than the customer's first day of data.
+ * WHY: a "per month" average over the last 90 days must divide by the months the customer
+ * actually has. Someone with 5 weeks of history would otherwise get a third of their real
+ * average. Totals don't change (there are no transactions before the first day).
+ */
+export function clampToHistory(range: DateRange): DateRange {
+  const first = getDataFirstDay();
+  return range.from < first ? { from: first, to: range.to } : range;
+}
+
 export function periodToRange(period: Period): DateRange {
   return resolvePeriod(period, getDataToday(), getDataFirstDay());
 }

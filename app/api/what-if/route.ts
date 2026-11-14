@@ -1,7 +1,8 @@
 /**
  * GET /api/what-if — for the what-if view's toggle and buttons. No AI involved. Response: WhatIf.
  * Params: target=<JSON SpendingTarget> (what the panel sends) OR category=<free text> (handy for curl),
- *         months=1|3|6 (default 1), cut=5|10|20 (default 5; anything else → 5).
+ *         months=1|3|6 (default 1), cut=a whole % 1–100 (default 5; the circles are 5 / 10 / 20 plus the
+ *         % the AI opened the view on, if another; junk → 5).
  * Default target: the customer's biggest everyday group (getDefaultTarget). Bad months / unknown target → 400.
  */
 import { connection } from "next/server";

@@ -190,6 +190,8 @@ export type ChartRow = {
   value2?: number;
   /** Green or red in the chat (see MoneyTone). Optional — older charts are unchanged. */
   tone?: MoneyTone;
+  /** Same for value2 (e.g. what_if: "20% less" in green next to "As now" in red). Added 14 Nov (additive). */
+  tone2?: MoneyTone;
   /** "cumulative" charts: true = this value is a projection, not real yet. */
   projected?: boolean;
   /** "cumulative" charts: average running total by this day over the last 12 months. */
@@ -437,6 +439,15 @@ export type ProjectionPoint = {
 /** The % options under the what-if chart, left → right. The first one is the default. */
 export const CUT_OPTIONS: number[] = [5, 10, 20];
 
+/**
+ * CUT_OPTIONS plus `extra` (e.g. 17 % from "skip one visit a week"), sorted. Added 14 Nov (additive).
+ * WHY: the AI may open the view on another %; it then gets its own circle next to 5 / 10 / 20.
+ * Shared by the server (WhatIf.cutOptions) and the panel (the circles), so they always match.
+ */
+export function cutOptionsWith(extra: number): number[] {
+  return CUT_OPTIONS.includes(extra) ? CUT_OPTIONS : [...CUT_OPTIONS, extra].sort((a, b) => a - b);
+}
+
 /** Next period's totals for one cut %. */
 export type CutSaving = { cutPct: number; withCutEur: number; savingEur: number };
 
@@ -472,7 +483,7 @@ export type LastYearSpending = { range: DateRange; spentEur: number };
 /** GET /api/what-if response body, and ChatMessage.whatIf. Built by lib/insights/whatIfForecast.ts. */
 export type WhatIf = {
   target: SpendingTarget;
-  cutPct: number; // the selected one of CUT_OPTIONS, e.g. 5
+  cutPct: number; // the selected %, e.g. 5 — one of CUT_OPTIONS, or any whole % 1–100 the AI picked
   months: ForecastMonths; // the period shown (always the one asked for)
   monthsWithData: ForecastMonths[]; // which toggle options show an estimate (spending on the target in the last 12 months; [] = none → 🙂 everywhere)
   basedOnMonths: ForecastMonths | null; // the chart's past period = lookback (null = not enough data); the estimate uses `average`
@@ -485,7 +496,7 @@ export type WhatIf = {
   noChangeEur: number; // next period, unchanged = average.perMonthEur × months
   withCutEur: number; // next period, with the cut
   savingEur: number; // noChangeEur − withCutEur
-  cutOptions: CutSaving[]; // the same totals for every CUT_OPTIONS % (for the chat message); [] = no data
+  cutOptions: CutSaving[]; // the same totals for every cutOptionsWith(cutPct) % (for the chat message); [] = no data
   points: ProjectionPoint[];
   average: MonthlyAverage | null; // what noChangeEur is based on (null = not enough data)
   lastYear: LastYearSpending | null; // same window a year ago; null = not fully in the history

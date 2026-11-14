@@ -75,6 +75,8 @@ export async function chatCompletion(opts: {
   messages: LlmMessage[];
   tools?: ToolDefinition[];
   reasoningEffort?: string;
+  /** "required" = the model must call a tool this round (used to retry a made-up answer). */
+  toolChoice?: "required";
   timeoutMs: number;
 }): Promise<Extract<LlmMessage, { role: "assistant" }>> {
   const url = opts.baseURL.replace(/\/+$/, "") + "/chat/completions";
@@ -84,6 +86,7 @@ export async function chatCompletion(opts: {
     ...(opts.tools?.length ? { tools: opts.tools } : {}),
     // WHY only when set: not every provider accepts this field.
     ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+    ...(opts.toolChoice ? { tool_choice: opts.toolChoice } : {}),
   });
 
   let res: Response;

@@ -26,6 +26,7 @@ import { mockReply } from "./mock";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
 import { moneyHealthNote } from "@/lib/insights/proactive";
+import { dropSentencesWith, euroAmounts, numbersIn, unsupportedAmounts } from "./amounts";
 
 const MAX_TOOL_ROUNDS = 6;
 /** Max time for ONE request to the LLM. */
@@ -84,6 +85,24 @@ function fallbackCharts(history: ChatMessage[]): ChartSpec[] {
   }
 }
 
+/**
+ * One line telling the model what the user already sees under an earlier reply.
+ * WHY: we send old replies as text only (charts would cost tokens), so the model didn't know
+ * the leaks chart was already on screen and drew it again for every follow-up about a habit.
+ */
+function onScreen(m: ChatMessage): string {
+  const shown = [
+    ...(m.charts ?? []).map((c) => `${c.type} chart "${c.title}"`),
+    ...(m.whatIf ? [`what-if view: ${m.whatIf.target.label}, ${m.whatIf.cutPct}% less`] : []),
+  ];
+  return shown.length ? `\n[On screen: ${shown.join("; ")}]` : "";
+}
+
+/** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
+function withoutOnScreenNotes(text: string): string {
+  return text.replace(/\s*\[On screen:[^\]\n]*\]/g, "").trim();
+}
+
 export async function runChat(history: ChatMessage[]): Promise<{
   reply: ChatMessage;
   mode: "live" | "mock";
@@ -115,28 +134,51 @@ export async function runChat(history: ChatMessage[]): Promise<{
         moneyNote: moneyHealthNote(),
       }),
     },
-    // WHY only text from history: earlier charts are already on screen;
-    // re-sending their data would waste tokens.
-    ...history.map((m): LlmMessage => ({ role: m.role, content: m.text })),
+    // WHY only text from history: earlier charts are already on screen; re-sending their
+    // data would waste tokens. onScreen() names them in one line instead.
+    ...history.map((m): LlmMessage => ({
+      role: m.role,
+      content: m.role === "assistant" ? m.text + onScreen(m) : m.text,
+    })),
   ];
 
   const charts: ChartSpec[] = [];
+  let whatIfBars = false; // what_if draws its own bar chart; a show_chart of it would be a twin
+  let toolCallsThisTurn = 0;
+  // Numbers the reply may use: from this turn's tool results + amounts already in the chat
+  // (the user's own, or the coach's from earlier turns — checked when they were written).
+  const knownNumbers: number[] = history.flatMap((m) => euroAmounts(m.text).map((a) => a.value));
+  let nudged = false;
+  // WHY force a tool after the nudge: Qwen ignored the plain "[App check]" message and wrote
+  // the same made-up €89.64 again (14.94 × 6 from its own earlier text).
+  let forceTool = false;
   let whatIf: WhatIf | undefined; // the last what_if_spending result opens the what-if view
 
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     console.log(`[ai] round ${round}: asking LLM…`);
     const start = Date.now();
     let msg;
-    try {
-      msg = await chatCompletion({
+    const ask = (toolChoice?: "required") =>
+      chatCompletion({
         baseURL: config.baseURL,
         apiKey: config.apiKey,
         model: config.model,
         messages,
         tools: TOOL_DEFINITIONS,
         reasoningEffort: config.reasoningEffort,
+        toolChoice,
         timeoutMs: LLM_TIMEOUT_MS,
       });
+    try {
+      try {
+        msg = await ask(forceTool ? "required" : undefined);
+      } catch (err) {
+        // WHY: not every provider accepts tool_choice "required"; then ask once without it.
+        if (!forceTool || !(err instanceof LlmError) || err.kind !== "http") throw err;
+        console.warn(`[ai] round ${round}: tool_choice=required refused (${err.message}), asking without it`);
+        msg = await ask();
+      }
+      forceTool = false;
     } catch (err) {
       const explained = explainLlmError(err, config.model);
       console.error(`[ai] round ${round}: FAILED after ${ms(start)} — ${explained}`);
@@ -145,8 +187,50 @@ export async function runChat(history: ChatMessage[]): Promise<{
 
     const toolCalls = (msg.tool_calls ?? []).filter((c) => c.type === "function");
 
+    // Made-up numbers → ask once to redo the answer with tools. Two checks:
+    // 1. digits but no tool call at all this turn;
+    // 2. a € amount that is in no tool result of this turn and nowhere earlier in the chat.
+    // WHY: Qwen invented "Cafes €48.20" (it had called show_chart only, which used to return no
+    // data) and "€142.30" (after what_if returned an error) for CUST01350, who never paid at a
+    // cafe. A false alarm only costs one extra round.
+    if (toolCalls.length === 0 && !nudged) {
+      const text = msg.content ?? "";
+      const noTool = toolCallsThisTurn === 0 && /\d/.test(text);
+      const invented = unsupportedAmounts(text, knownNumbers);
+      if (noTool || invented.length > 0) {
+        nudged = true;
+        forceTool = true;
+        console.warn(
+          `[ai] round ${round}: ${noTool ? "numbers but no tool call" : `amounts not from any tool: ${invented.join(", ")}`} — asking again`,
+        );
+        messages.push(msg, {
+          role: "user",
+          content: noTool
+            ? "[App check, not from the user] Your answer has numbers, but you called no tool in this turn, " +
+              "so they may be wrong. Call the right tool(s) now and write the answer again using only " +
+              "numbers from their results."
+            : `[App check, not from the user] These amounts are in no tool result: ${invented.join(", ")}. ` +
+              "Call the tool that returns them, or write the answer again without them. Use only " +
+              "numbers from tool results.",
+        });
+        continue;
+      }
+    }
+
     // No tool calls → the model has written its final answer.
     if (toolCalls.length === 0) {
+      let text = withoutOnScreenNotes(msg.content ?? "");
+      const stillInvented = unsupportedAmounts(text, knownNumbers);
+      if (stillInvented.length > 0) {
+        console.warn(
+          `[ai] warning: final answer still has amounts not from a tool: ${stillInvented.join(", ")} — sentences dropped`,
+        );
+        text =
+          dropSentencesWith(text, stillInvented) ||
+          "Sorry, I couldn't get that number from your data. Could you ask in a different way?";
+      } else if (toolCallsThisTurn === 0 && /\d/.test(text)) {
+        console.warn("[ai] warning: final answer has numbers but still no tool call");
+      }
       console.log(
         `[ai] round ${round}: final answer in ${ms(start)} (${(msg.content ?? "").length} chars)`,
       );
@@ -156,7 +240,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
           role: "assistant",
           // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
           // sure (lib/noDashes.ts, lib/euroAfter.ts).
-          text: euroAfter(noLongDashes(msg.content ?? "")),
+          text: euroAfter(noLongDashes(text)),
           // No chart from the model → safety net adds one, unless the what-if
           // view opens (that panel already is the visual).
           charts: charts.length > 0 || whatIf ? charts : fallbackCharts(history),
@@ -171,6 +255,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
     );
 
     // Run every requested tool and send the results back to the model.
+    toolCallsThisTurn += toolCalls.length;
     messages.push(msg);
     for (const call of toolCalls) {
       let args: Record<string, unknown> = {};
@@ -198,8 +283,19 @@ export async function runChat(history: ChatMessage[]): Promise<{
       console.log(
         `[ai]   ${call.function.name}(${JSON.stringify(args)}) → ${result.content.slice(0, 150)}`,
       );
-      if ("chart" in result && result.chart) charts.push(result.chart);
+      if ("chart" in result && result.chart) {
+        const isWhatIfBars =
+          call.function.name === "what_if" ||
+          (call.function.name === "show_chart" && args.data_tool === "what_if");
+        if (isWhatIfBars && whatIfBars) {
+          console.log("[ai]   skipped a second what_if bar chart");
+        } else {
+          charts.push(result.chart);
+          whatIfBars ||= isWhatIfBars;
+        }
+      }
       if ("whatIf" in result && result.whatIf) whatIf = result.whatIf;
+      knownNumbers.push(...numbersIn(result.content));
       messages.push({ role: "tool", tool_call_id: call.id, content: result.content });
     }
   }
