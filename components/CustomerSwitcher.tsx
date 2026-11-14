@@ -16,7 +16,7 @@ import { versionLabel } from "@/lib/version";
 
 const SHOW_CUSTOMER_SWITCHER = true;
 
-const eur = (n: number) => `€${n.toLocaleString("fi-FI")}`;
+const eur = (n: number) => `${n.toLocaleString("fi-FI")} €`;
 const reason = (r: string | null) => (r ?? "").replace(/_/g, " ");
 
 function LoanBadge({ m }: { m: NonNullable<DemoCustomerOption["mortgage"]> }) {

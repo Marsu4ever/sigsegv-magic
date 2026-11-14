@@ -1,14 +1,18 @@
 "use client";
 /**
- * "Account" tab — the bank-app overview: balance, money in/out this month, balance
- * history, a shortcut to the coach, and every transaction (newest first, "Show more").
- * Data: GET /api/account (lib/data/home.ts). No AI involved. Owner: UI person.
+ * "Account" tab — the bank-app overview. Data: GET /api/account (lib/data/home.ts).
+ * No AI involved. Owner: UI person.
+ *
+ * WHY this order (built for a quick glance — "explain it to an 18-year-old"):
+ * balance first, then one-line "For you" hooks, this month in/out, then purchases one
+ * month at a time (‹ › or swipe). Details hide behind a tap: the balance chart behind
+ * "History", each insight behind its hook (components/insights/InsightCards.tsx).
  *
  * WHY no Pay / Transfer buttons: this is a demo on read-only data; buttons that do
  * nothing would look broken in front of judges.
  */
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AccountSummary, AccountTransaction } from "@/lib/types";
 import { CategoryTile } from "@/components/charts/categoryIcons";
 import { BalanceChart } from "./BalanceChart";
@@ -25,12 +29,12 @@ function previousDay(iso: string): string {
 
 const eur = (n: number) => formatValue(n, "€");
 
-/** Questions that open the chat with the coach already asking (see ChatView ?ask=). */
-const COACH_QUESTIONS = [
-  "Where did my money go this month?",
-  "What's safe for me to spend this week?",
-  "How could I save more?",
-];
+/** "2026-09" + 1 → "2026-10" (month arithmetic for the ‹ › arrows). */
+function shiftMonth(ym: string, by: number): string {
+  const [y, m] = ym.split("-").map(Number);
+  const i = y * 12 + (m - 1) + by;
+  return `${Math.floor(i / 12)}-${String((i % 12) + 1).padStart(2, "0")}`;
+}
 
 /** "2026-09-01" → "September" (the month the in/out tiles cover). */
 function monthName(iso: string): string {
@@ -91,41 +95,57 @@ function TransactionRow({ t }: { t: AccountTransaction }) {
 
 export function AccountView() {
   const [data, setData] = useState<AccountSummary | null>(null);
-  const [txs, setTxs] = useState<AccountTransaction[]>([]);
-  const [nextOffset, setNextOffset] = useState<number | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMonth, setLoadingMonth] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const touch = useRef<{ x: number; y: number } | null>(null);
 
-  async function load(offset: number): Promise<AccountSummary> {
-    const res = await fetch(`/api/account?offset=${offset}`);
+  async function load(month?: string): Promise<AccountSummary> {
+    const res = await fetch(`/api/account${month ? `?month=${month}` : ""}`);
     const json = await res.json();
     if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`);
     return json as AccountSummary;
   }
 
   useEffect(() => {
-    load(0)
-      .then((d) => {
-        setData(d);
-        setTxs(d.transactions);
-        setNextOffset(d.nextOffset);
-      })
+    load()
+      .then(setData)
       .catch((err) => setError(String(err.message ?? err)));
   }, []);
 
-  async function showMore() {
-    if (nextOffset === null) return;
-    setLoadingMore(true);
+  /** Previous (-1) or next (+1) month in the purchase list. */
+  async function goToMonth(by: number) {
+    if (!data || loadingMonth) return;
+    const target = shiftMonth(data.list.month, by);
+    if (target < data.list.first || target > data.list.last) return;
+    setLoadingMonth(true);
     try {
-      const d = await load(nextOffset);
-      setTxs((t) => [...t, ...d.transactions]);
-      setNextOffset(d.nextOffset);
+      const d = await load(target);
+      setData((prev) => (prev ? { ...prev, list: d.list, transactions: d.transactions } : d));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setLoadingMore(false);
+      setLoadingMonth(false);
     }
   }
+
+  // WHY swipe too: sideways swipes feel natural on a phone. Mostly-vertical moves are
+  // scrolling, so they're ignored.
+  function onTouchStart(e: React.TouchEvent) {
+    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const start = touch.current;
+    touch.current = null;
+    if (!start) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) goToMonth(dx > 0 ? -1 : 1);
+  }
+
+  const list = data?.list;
+  const canGoBack = !!list && list.month > list.first;
+  const canGoForward = !!list && list.month < list.last;
 
   return (
     <div className="h-full overflow-y-auto">
@@ -138,15 +158,47 @@ export function AccountView() {
         {error && <p className="text-sm text-danger">⚠️ {error}</p>}
         {!data && !error && <p className="text-sm text-muted">Loading…</p>}
 
-        {data && (
+        {data && list && (
           <>
-            {/* Balance */}
+            {/* Balance — the one number everybody looks for first */}
             <section className="rounded-2xl bg-accent p-5 text-accent-foreground shadow-sm">
-              <p className="text-sm font-medium opacity-90">Current account</p>
-              <p className="text-xs opacity-75">{data.accountId}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium opacity-90">Current account</p>
+                  <p className="text-xs opacity-75">{data.accountId}</p>
+                </div>
+                {data.balanceHistory.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory((s) => !s)}
+                    aria-expanded={showHistory}
+                    className="flex items-center gap-1 rounded-full bg-accent-foreground/15 px-3 py-1 text-xs font-medium"
+                  >
+                    <Icon name="trend" size={14} /> {showHistory ? "Hide" : "History"}
+                  </button>
+                )}
+              </div>
               <p className="mt-4 text-4xl font-bold tabular-nums">{eur(data.balanceEur)}</p>
               <p className="mt-1 text-xs opacity-80">Balance on {fiDate(data.asOf)}</p>
             </section>
+
+            {/* Balance history: only when asked for */}
+            {showHistory && (
+              <section className="rounded-xl bg-surface p-4 shadow-sm">
+                <h2 className="text-sm font-semibold">Balance, last 90 days</h2>
+                {data.lowest && (
+                  <p className="text-xs text-muted">
+                    Lowest: {eur(data.lowest.balanceEur)} on {fiDate(data.lowest.date)}
+                  </p>
+                )}
+                <div className="mt-2">
+                  <BalanceChart rows={data.balanceHistory} />
+                </div>
+              </section>
+            )}
+
+            {/* What the coach noticed: one line each, details on tap */}
+            <InsightCards />
 
             {/* This month in / out */}
             <div className="grid grid-cols-2 gap-3">
@@ -164,72 +216,68 @@ export function AccountView() {
               </section>
             </div>
 
-            {/* What the coach noticed without being asked */}
-            <InsightCards />
-
-            {/* Balance history */}
-            {data.balanceHistory.length > 1 && (
-              <section className="rounded-xl bg-surface p-4 shadow-sm">
-                <h2 className="text-sm font-semibold">Balance, last 90 days</h2>
-                {data.lowest && (
-                  <p className="text-xs text-muted">
-                    Lowest: {eur(data.lowest.balanceEur)} on {fiDate(data.lowest.date)}
+            {/* Purchases, one month at a time: ‹ › or swipe */}
+            <section
+              className="overflow-hidden rounded-xl bg-surface shadow-sm"
+              onTouchStart={onTouchStart}
+              onTouchEnd={onTouchEnd}
+            >
+              <div className="flex items-center justify-between gap-2 px-2 pb-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => goToMonth(-1)}
+                  disabled={!canGoBack || loadingMonth}
+                  aria-label="Previous month"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
+                >
+                  ‹
+                </button>
+                <div className="text-center">
+                  <p className="text-sm font-semibold">
+                    {monthName(`${list.month}-01`)} {list.month.slice(0, 4)}
                   </p>
-                )}
-                <div className="mt-2">
-                  <BalanceChart rows={data.balanceHistory} />
+                  <p className="text-xs text-muted tabular-nums">
+                    In <span className="text-money-in">+{eur(list.incomeEur)}</span> · Out{" "}
+                    {eur(-list.spendingEur)}
+                  </p>
                 </div>
-              </section>
-            )}
-
-            {/* Shortcut to the coach */}
-            <section className="rounded-xl bg-surface p-4 shadow-sm">
-              <h2 className="flex items-center gap-2 text-sm font-semibold">
-                <span className="text-accent">
-                  <Icon name="sparkles" size={18} />
-                </span>
-                Ask Money Coach
-              </h2>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {COACH_QUESTIONS.map((q) => (
-                  <Link
-                    key={q}
-                    href={`/chat?ask=${encodeURIComponent(q)}`}
-                    className="rounded-full border border-line bg-background px-3 py-1.5 text-sm"
-                  >
-                    {q}
-                  </Link>
+                <button
+                  type="button"
+                  onClick={() => goToMonth(1)}
+                  disabled={!canGoForward || loadingMonth}
+                  aria-label="Next month"
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
+                >
+                  ›
+                </button>
+              </div>
+              <div className={loadingMonth ? "opacity-50 transition-opacity" : "transition-opacity"}>
+                {groupByDay(data.transactions).map((g) => (
+                  <div key={g.date}>
+                    <p className="bg-background px-4 py-1.5 text-xs font-medium text-muted">
+                      {dayLabel(g.date, data.asOf)}
+                    </p>
+                    <ul>
+                      {g.items.map((t, i) => (
+                        <TransactionRow key={`${t.date}-${t.time}-${i}`} t={t} />
+                      ))}
+                    </ul>
+                  </div>
                 ))}
+                {data.transactions.length === 0 && (
+                  <p className="px-4 pb-4 text-sm text-muted">No transactions this month.</p>
+                )}
               </div>
             </section>
 
-            {/* Transactions */}
-            <section className="overflow-hidden rounded-xl bg-surface shadow-sm">
-              <h2 className="px-4 pb-2 pt-4 text-sm font-semibold">Transactions</h2>
-              {groupByDay(txs).map((g) => (
-                <div key={g.date}>
-                  <p className="bg-background px-4 py-1.5 text-xs font-medium text-muted">
-                    {dayLabel(g.date, data.asOf)}
-                  </p>
-                  <ul>
-                    {g.items.map((t, i) => (
-                      <TransactionRow key={`${t.date}-${t.time}-${i}`} t={t} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-              {txs.length === 0 && <p className="px-4 pb-4 text-sm text-muted">No transactions.</p>}
-              {nextOffset !== null && (
-                <button
-                  type="button"
-                  onClick={showMore}
-                  disabled={loadingMore}
-                  className="w-full border-t border-line py-3 text-sm font-medium text-accent disabled:opacity-50"
-                >
-                  {loadingMore ? "Loading…" : "Show more"}
-                </button>
-              )}
-            </section>
+            {/* One slim way into the coach (the Chat tab is also far left) */}
+            <Link href="/chat" className="flex items-center gap-3 rounded-xl bg-surface p-4 shadow-sm">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+                <Icon name="chat" size={18} />
+              </span>
+              <span className="flex-1 text-sm font-medium">Ask Money Coach anything</span>
+              <Icon name="chevron" size={16} className="text-muted" />
+            </Link>
           </>
         )}
       </div>

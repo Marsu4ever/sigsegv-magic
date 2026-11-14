@@ -32,9 +32,11 @@ function chart(
   return runTool("show_chart", { chart_type: type, title, data_tool: tool, data_args: args }).chart;
 }
 
-const eur = (n: number) => `€${Number(n).toFixed(2)}`;
-/** Big amounts (home loans) without cents: 285500 → "€285,500". */
-const eur0 = (n: number) => `€${Math.round(n).toLocaleString("en")}`;
+/** 1520.86 → "1 520,86 €" (Finnish style, € after the number: same as every other screen). */
+const eur = (n: number) =>
+  `${Number(n).toLocaleString("fi-FI", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+/** Big amounts (home loans) without cents: 285500 → "285 500 €". */
+const eur0 = (n: number) => `${Math.round(n).toLocaleString("fi-FI")} €`;
 /** Colored amounts in the chat (components/chat/MoneyText.tsx): green = money in, red = out. */
 const plus = (n: number) => `{+${eur(n)}}`;
 const minus = (n: number) => `{-${eur(n)}}`;
@@ -115,8 +117,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
   if (has(q, "save more", "how can i save", "how could i save", "help me save", "ways to save")) {
     const all = data("proactive_insights").insights as { kind: string; action: string; total?: { value: number } }[];
     const help = all.find((i) => i.kind === "save_help");
-    // WHY fi-FI here: same "1 234 €" style as the insight texts it continues.
-    const year = help?.total ? ` That adds up to {+${Math.round(help.total.value).toLocaleString("fi-FI")} €} a year.` : "";
+    const year = help?.total ? ` That adds up to {+${eur0(help.total.value)}} a year.` : "";
     if (help) return replyText(`${help.action}${year}`);
   }
   if (has(q, "should i know", "anything new", "alerts", "how am i doing overall")) {
@@ -190,7 +191,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const p = data("spender_profile");
     return reply(
       `You're a "${p.type}" (${p.typeRule}). You keep ${Math.round(p.keptShare * 100)}% of your income. ` +
-        `Small purchases under €${p.smallPurchasesLast90Days.maxEur} add up to ${minus(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
+        `Small purchases under ${p.smallPurchasesLast90Days.maxEur} € add up to ${minus(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
       chart("pie", "Your spending by basket (%)", "spender_profile"),
     );
   }
@@ -220,7 +221,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
   if (has(q, "slip", "leak", "small purchase", "coffee", "where does my money")) {
     const l = data("everyday_leaks", { period: "last_90_days" });
     return reply(
-      `Small purchases (≤ €${l.smallPurchases.maxEur}) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
+      `Small purchases (≤ ${l.smallPurchases.maxEur} €) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
         `${minus(l.smallPurchases.perMonthEur)} a month, ${minus(l.smallPurchases.perYearEur)} a year.`,
       chart("leaks", "Where my money slips away 💸", "everyday_leaks", { period: "last_90_days" }),
     );
@@ -238,7 +239,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const b = data("irregular_buffer");
     return reply(
       `Surprise costs average ${minus(b.averagePerMonthEur)} a month; the worst month was ${b.worstMonth?.month} ` +
-        `(${minus(b.worstMonth?.eur ?? 0)}). A buffer of about €${b.suggestion.emergencyBufferEur} would cover that.`,
+        `(${minus(b.worstMonth?.eur ?? 0)}). A buffer of about ${b.suggestion.emergencyBufferEur} € would cover that.`,
       chart("bar", "Surprise costs per month", "irregular_buffer"),
     );
   }

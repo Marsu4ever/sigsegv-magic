@@ -131,6 +131,7 @@ function saveHelp(): Insight | null {
     id: "save-help",
     kind: "save_help",
     title: overspending ? "You're spending more than you earn" : "You're keeping very little of your income",
+    hook: `You could save ${plus(savePerMonth * 12)} a year`,
     detail:
       `In ${monthName(h.range.from)}–${monthName(h.range.to)} you earned ${plus(h.incomePerMonth)} a month and spent ${minus(h.spendingPerMonth)}, ` +
       (overspending ? `so ${minus(-left)} a month more than came in.` : `leaving only ${plus(left)} (${pct(h.keptShare)}).`),
@@ -219,6 +220,7 @@ function spendingAlert(): (Insight & { category: string }) | null {
     kind: "spending_alert",
     category,
     title: `Your ${noun(category)} spending increased`,
+    hook: `${category} up ${pct(spent / expected - 1)} ${when}`,
     detail: `You've spent ${minus(spent)} on ${category.toLowerCase()} ${when}, ${pct(spent / expected - 1)} more than usual.${driverText}`,
     why: `Compared with your average month for ${category.toLowerCase()}: ${minus(usual)} over the ${baseMonths} months before.`,
     action: `Try a weekly ${noun(category)} budget of about ${eur(weekly)}: your usual month spread over its weeks.`,
@@ -246,6 +248,7 @@ function recurring(): Insight | null {
     id: "recurring",
     kind: "recurring",
     title: `You have ${items.length} recurring payments`,
+    hook: `${minus(yearly / 12)} a month goes out on repeat`,
     detail: `Together they cost about ${minus(yearly / 12)} a month.`,
     why: "Each one showed up in 6 or more of the last 12 months.",
     action: habits.length
@@ -278,6 +281,7 @@ function unusualThisWeek(today: string): (Insight & { category: string }) | null
     kind: "unusual",
     category: best.category,
     title: `Your ${noun(best.category)} spending is unusually high this week`,
+    hook: `${best.category} ${(best.spent / best.usual).toFixed(1)}× your usual week`,
     detail: `${minus(best.spent)} on ${c} in the last 7 days, about ${(best.spent / best.usual).toFixed(1)}× your usual week.`,
     why: `Your usual week for ${c}: ${minus(best.usual)} (average of the 12 weeks before).`,
     action: `Keep ${c} light for the next few days to get back to your usual ${eur(best.usual)} a week.`,
@@ -302,6 +306,7 @@ function unusualPurchase(today: string): (Insight & { category: string }) | null
     kind: "unusual",
     category: big.category,
     title: "A purchase much larger than usual",
+    hook: `One ${minus(spentEur(big))} purchase stood out`,
     detail: `You paid ${minus(spentEur(big))} for ${what.toLowerCase()} on ${fi(big.date)}, much more than your usual purchase.`,
     why: `9 in 10 of your purchases in the past year were under ${eur(p90)}.`,
     action: "If you don't recognise it, check it with the bank. If it was planned, set a little aside each month so big buys don't surprise you.",
@@ -332,6 +337,7 @@ function spendingOutgrowsIncome(today: string): Insight | null {
     id: "unusual-growth",
     kind: "unusual",
     title: "Your spending is growing faster than your income",
+    hook: `Spending up ${pct(spendGrowth)}, income ${incomeGrowth < 0 ? "down" : "up"} ${pct(Math.abs(incomeGrowth))}`,
     detail:
       `Your spending went up ${pct(spendGrowth)}, while your income ` +
       (incomeGrowth < 0 ? `fell ${pct(-incomeGrowth)}.` : `grew only ${pct(incomeGrowth)}.`),

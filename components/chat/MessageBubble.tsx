@@ -4,6 +4,7 @@ import { ChartCard } from "@/components/charts/ChartCard";
 import { MoneyText } from "./MoneyText";
 import { splitFollowUp } from "@/lib/followUp";
 import { noLongDashes } from "@/lib/noDashes";
+import { euroAfter } from "@/lib/euroAfter";
 
 // WHY no "show chart" link on what-if replies: the what-if panel stays above the chat,
 // so the user can just scroll up to it.
@@ -19,7 +20,7 @@ export function MessageBubble({
   // The coach's [[offer]] marker becomes a button (lib/followUp.ts).
   const { body, followUp } = isUser
     ? { body: message.text, followUp: null }
-    : splitFollowUp(noLongDashes(message.text));
+    : splitFollowUp(euroAfter(noLongDashes(message.text)));
   // WHY full width with charts: charts and the calendar need the room on a phone.
   const width = message.charts?.length ? "w-full" : "w-[85%] max-w-[85%]";
   return (

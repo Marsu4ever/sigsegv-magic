@@ -1,6 +1,6 @@
 /**
- * GET /api/account?offset=N — the Account tab: balance, this month in/out, balance
- * history and one page of transactions (newest first). No AI involved.
+ * GET /api/account?month=YYYY-MM — the Account tab: balance, this month in/out, balance
+ * history and one month of transactions (newest first; default: the latest month). No AI involved.
  * Response: AccountSummary (see lib/types.ts).
  */
 import { connection } from "next/server";
@@ -10,9 +10,9 @@ import { withPickedCustomer } from "@/lib/data/request";
 export async function GET(request: Request) {
   // WHY connection(): compute on every request, not once at build time.
   await connection();
-  const offset = Number(new URL(request.url).searchParams.get("offset")) || 0;
+  const month = new URL(request.url).searchParams.get("month") ?? undefined;
   try {
-    return Response.json(await withPickedCustomer(() => getAccountSummary(offset)));
+    return Response.json(await withPickedCustomer(() => getAccountSummary(month)));
   } catch (err) {
     console.error("[api/account]", err);
     const detail = err instanceof Error ? err.message : String(err);

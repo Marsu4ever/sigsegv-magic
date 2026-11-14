@@ -220,7 +220,7 @@ function Headline({ v, saved, compact }: { v: LeaksView; saved: number; compact:
       {/* Small stuff sits at the bottom of the box (team call); not in the chat card. */}
       {!compact && (
         <div className="mt-2 text-xs text-muted">
-          small stuff (≤ €{v.smallMaxEur}) alone:{" "}
+          small stuff (≤ {v.smallMaxEur} €) alone:{" "}
           <span className="font-semibold text-foreground">
             <CountUp value={v.smallPerYearEur} format={eur0} delay={300} />
           </span>
