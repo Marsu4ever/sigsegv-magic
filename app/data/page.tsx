@@ -242,7 +242,7 @@ const CHART_EXAMPLES: { what: string; args: Record<string, unknown> }[] = [
     what: "The 3 baskets with categories — tap a category to see what's inside",
     args: {
       chart_type: "baskets",
-      title: "Your 3 baskets",
+      title: "Your spending types",
       data_tool: "basket_details",
       data_args: { period: "this_month" },
     },

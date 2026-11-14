@@ -192,7 +192,7 @@ function StackedBar({
       <div
         className={`flex w-full gap-0.5 overflow-hidden rounded-lg ${tall ? "h-9" : "h-5"}`}
         role="img"
-        aria-label="Spending split into the 3 baskets and their categories"
+        aria-label="Spending split into the 3 spending types and their categories"
       >
         {baskets.flatMap((b) =>
           b.categories.map((c, i) => {

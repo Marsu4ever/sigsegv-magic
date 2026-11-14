@@ -35,7 +35,7 @@ const SUGGESTIONS = [
   "What kind of spender am I?",
   "Where does my money slip away?",
   "What's safe for me to spend this week?",
-  "How are my 3 baskets looking?",
+  "What's happening with my spending types?",
   "Show my spending calendar",
   "How am I doing this month?",
 ];
@@ -49,7 +49,7 @@ function suggestionIcon(text: string): IconName {
   if (q.includes("slip")) return "coins";
   if (q.includes("what if")) return "sliders";
   if (q.includes("safe")) return "shield";
-  if (q.includes("basket")) return "basket";
+  if (q.includes("basket") || q.includes("spending type")) return "basket";
   if (q.includes("calendar")) return "calendar";
   if (q.includes("this month")) return "trend";
   return "sparkles";

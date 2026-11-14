@@ -119,7 +119,7 @@ function fallbackCharts(
         if (c.type !== "baskets" || !fetched || !/^basket_(breakdown|details)$/.test(fetched.tool)) return c;
         const same = runTool("show_chart", {
           chart_type: "baskets",
-          title: "Your 3 baskets",
+          title: "Your spending types",
           data_tool: "basket_details",
           data_args: fetched.args,
         }).chart;

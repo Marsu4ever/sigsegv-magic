@@ -674,7 +674,7 @@ export function autoChartArgs(tool: string, args: Args): { chart_type: ChartType
     };
   }
   if (tool === "balance_over_time") return { chart_type: "line", title: `Balance${span}` };
-  if (tool === "spender_profile") return { chart_type: "pie", title: "Your spending by basket (%)" };
+  if (tool === "spender_profile") return { chart_type: "pie", title: "Your spending by type (%)" };
   if (tool === "spend_over_time") {
     const cat = typeof args.category === "string" && args.category.trim() ? args.category.trim() : "";
     const name = cat ? cat[0].toUpperCase() + cat.slice(1) : "Spending";
