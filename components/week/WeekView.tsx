@@ -10,13 +10,7 @@ import { useEffect, useState } from "react";
 import type { WeekSummary } from "@/lib/types";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import { ChartCard } from "@/components/charts/ChartCard";
-import { formatValue } from "@/components/charts/ChartRenderer";
-
-/** "2026-09-23" → "23.9.2026" (Finnish style). */
-function fiDate(iso: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  return `${d}.${m}.${y}`;
-}
+import { fiDate, formatValue } from "@/components/charts/format";
 
 const BASKET_DOT: Record<string, string> = {
   mandatory_regular: "var(--basket-regular)",

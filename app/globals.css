@@ -36,6 +36,10 @@
   --heat-1: #c3e6d5;
   --heat-2: #7fcca6;
   --heat-3: #2fa877;
+
+  /* What-if chart: the two projected lines. Far apart in hue so they don't blend. */
+  --forecast-no-change: #dc2626;
+  --forecast-with-cut: #2f6fd6;
 }
 
 /*
@@ -68,6 +72,10 @@
   --heat-1: #173d2c;
   --heat-2: #1f6b4a;
   --heat-3: #2a9a6a;
+
+  /* What-if chart lines: brighter on black (same as --danger / --basket-regular here). */
+  --forecast-no-change: #f87171;
+  --forecast-with-cut: #5b8ef0;
 }
 
 @theme inline {
@@ -153,7 +161,8 @@ body {
   animation: jar-drop-in 0.7s ease-in both;
 }
 
-/* Cards and lines slide up into place one after another. */
+/* Cards and lines slide up into place one after another.
+   .fade-up = the same, for anything outside Leaks (e.g. the what-if chart ⇄ purchases swap). */
 @keyframes leak-fade-up {
   from {
     opacity: 0;
@@ -164,7 +173,8 @@ body {
     transform: translateY(0);
   }
 }
-.leak-fade-up {
+.leak-fade-up,
+.fade-up {
   animation: leak-fade-up 0.45s ease-out both;
 }
 
@@ -189,6 +199,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .jar-drop,
   .leak-fade-up,
+  .fade-up,
   .leak-pop {
     animation: none;
   }

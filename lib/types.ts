@@ -280,6 +280,7 @@ export type ChatMessage = {
   role: ChatRole;
   text: string;
   charts?: ChartSpec[]; // only on assistant messages
+  whatIf?: WhatIf; // only on assistant messages; opens the what-if view
 };
 
 /** POST /api/chat request body. Send the whole conversation so far. */
@@ -313,4 +314,94 @@ export type WeekSummary = {
   byBasket: Record<Basket, number>;
   byDay: ChartRow[]; // one row per day, label = "Mon", "Tue", ...
   topCategories: ChartRow[];
+};
+
+// ─── What-if / forecast ──────────────────────────────────────────────────
+
+/** How far ahead a forecast looks — and how much history it is based on. */
+export type ForecastMonths = 1 | 3 | 6;
+
+/** Toggle order in the UI, left → right. The first one is the default. */
+export const FORECAST_MONTHS: ForecastMonths[] = [1, 3, 6];
+
+/** Toggle labels. */
+export const FORECAST_LABELS: Record<ForecastMonths, string> = {
+  1: "Month",
+  3: "3 months",
+  6: "6 months",
+};
+
+/** For sentences: "next " + text / "last " + text → "next month", "last 3 months". */
+export const FORECAST_PERIOD_TEXT: Record<ForecastMonths, string> = {
+  1: "month",
+  3: "3 months",
+  6: "6 months",
+};
+
+/**
+ * ok = based on the same length of history as asked.
+ * fallback = the customer's history is shorter; a shorter period was scaled up.
+ * not_enough_data = nothing to show (see WhatIf.emptyReason).
+ */
+export type ForecastStatus = "ok" | "fallback" | "not_enough_data";
+
+/**
+ * WHAT a what-if is about. A transaction matches if its category OR its merchant type
+ * (MCC, see lib/data/merchantTypes.ts) is listed. WHY not just a category: lets the AI
+ * narrow or widen it (e.g. only "Fast food", or "Eating out" = Restaurants + Cafes +
+ * Takeaway) with the same components.
+ */
+export type SpendingTarget = {
+  label: string; // shown to the user, e.g. "Restaurants"
+  categories: string[]; // dataset categories, e.g. ["Restaurants"]
+  merchantTypes: string[]; // e.g. ["Fast food"]
+};
+
+/** One point of a projection chart. Running totals in €; null = this line has no value here. */
+export type ProjectionPoint = {
+  date: string; // "YYYY-MM-DD"
+  actual: number | null; // past: what was really spent
+  noChange: number | null; // future: if nothing changes
+  withCut: number | null; // future: if spending drops by cutPct
+};
+
+/** The % options under the what-if chart, left → right. The first one is the default. */
+export const CUT_OPTIONS: number[] = [5, 10, 20];
+
+/** Next period's totals for one cut %. */
+export type CutSaving = { cutPct: number; withCutEur: number; savingEur: number };
+
+/** A "What if I spend less on X?" option. */
+export type CategoryOption = { target: SpendingTarget; spentEur: number };
+
+/**
+ * One purchase of a what-if target — GET /api/what-if/purchases (the list behind a tapped
+ * point on the what-if chart). Added 14 Nov (new type only).
+ */
+export type TargetPurchase = {
+  date: string; // "YYYY-MM-DD"
+  merchant: string; // merchant type from the MCC (e.g. "Fast food"), else the category
+  amountEur: number; // positive = spent
+};
+
+/** GET /api/what-if response body, and ChatMessage.whatIf. Built by lib/insights/whatIfForecast.ts. */
+export type WhatIf = {
+  target: SpendingTarget;
+  cutPct: number; // the selected one of CUT_OPTIONS, e.g. 5
+  months: ForecastMonths; // the period shown (always the one asked for)
+  monthsWithData: ForecastMonths[]; // which toggle options have spending on the target ([] = none → 🙂 everywhere)
+  basedOnMonths: ForecastMonths | null; // history actually used (null = not enough data)
+  status: ForecastStatus;
+  emptyReason: "short_history" | "no_spending" | null;
+  today: string;
+  lookback: DateRange | null;
+  horizon: DateRange;
+  pastEur: number; // spent on the target in the lookback
+  noChangeEur: number; // next period, unchanged
+  withCutEur: number; // next period, with the cut
+  savingEur: number; // noChangeEur − withCutEur
+  cutOptions: CutSaving[]; // the same totals for every CUT_OPTIONS % (for the chat message); [] = no data
+  points: ProjectionPoint[];
+  breakdown: ChartRow[]; // what the target is made of (sub-categories / merchant types), biggest first
+  topCategories: CategoryOption[]; // next 2 biggest everyday-basket groups in the lookback (target left out)
 };

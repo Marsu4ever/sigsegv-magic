@@ -9,7 +9,7 @@
  * DEBUGGING: every step logs a line starting with [ai] to the terminal
  * running `npm run dev`. If the chat hangs or fails, look there first.
  */
-import type { ChartSpec, ChatMessage } from "@/lib/types";
+import type { ChartSpec, ChatMessage, WhatIf } from "@/lib/types";
 import {
   allMerchantTypes,
   getCustomer,
@@ -19,6 +19,7 @@ import {
 } from "@/lib/data";
 import { getAiConfig } from "./config";
 import { chatCompletion, LlmError, type LlmMessage } from "./llm";
+import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, runTool } from "./tools";
 import { mockReply } from "./mock";
@@ -83,6 +84,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
         categories: listCategories(),
         merchantTypes: allMerchantTypes(),
         age: getCustomer().age,
+        whatIfDefault: getDefaultTarget().label,
       }),
     },
     // WHY only text from history: earlier charts are already on screen;
@@ -91,6 +93,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
   ];
 
   const charts: ChartSpec[] = [];
+  let whatIf: WhatIf | undefined; // the last what_if_spending result opens the what-if view
 
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     console.log(`[ai] round ${round}: asking LLM…`);
@@ -121,7 +124,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
       );
       if (!msg.content) console.warn("[ai] warning: final answer is empty");
       return {
-        reply: { role: "assistant", text: msg.content ?? "", charts },
+        reply: { role: "assistant", text: msg.content ?? "", charts, whatIf },
         mode: "live",
       };
     }
@@ -159,6 +162,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
         `[ai]   ${call.function.name}(${JSON.stringify(args)}) → ${result.content.slice(0, 150)}`,
       );
       if ("chart" in result && result.chart) charts.push(result.chart);
+      if ("whatIf" in result && result.whatIf) whatIf = result.whatIf;
       messages.push({ role: "tool", tool_call_id: call.id, content: result.content });
     }
   }
@@ -169,6 +173,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
       role: "assistant",
       text: "Sorry, I got stuck working that out. Could you ask in a different way?",
       charts,
+      whatIf,
     },
     mode: "live",
   };

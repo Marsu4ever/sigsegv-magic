@@ -40,22 +40,7 @@ export function toneClass(tone: ChartRow["tone"]): string {
   return tone === "in" ? "text-money-in" : tone === "out" ? "text-money-out" : "";
 }
 
-export function formatValue(value: number, unit: string): string {
-  return unit === "€"
-    ? value.toLocaleString("fi-FI", { style: "currency", currency: "EUR" })
-    : `${value} ${unit}`;
-}
-
-/**
- * Shorten ISO dates on axes (Finnish style):
- * daily/weekly "2026-11-03" → "3.11." · monthly "2026-11-01" → "11/26".
- * WHY: monthly data spans years, so the year must show or months repeat.
- */
-function shortLabel(label: string, monthly: boolean): string {
-  const m = label.match(/^\d{2}(\d{2})-(\d{2})-(\d{2})$/);
-  if (!m) return label;
-  return monthly ? `${Number(m[2])}/${m[1]}` : `${Number(m[3])}.${Number(m[2])}.`;
-}
+import { formatValue, shortLabel } from "./format";
 
 function isMonthly(rows: { label: string }[]): boolean {
   return rows.length > 1 && rows.every((r) => /^\d{4}-\d{2}-01$/.test(r.label));

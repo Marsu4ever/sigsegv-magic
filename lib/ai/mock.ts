@@ -8,8 +8,11 @@
  * Used automatically when LLM_BASE_URL / LLM_MODEL are not set, or AI_MODE=mock.
  * The real AI understands any wording; the mock only reacts to the keywords below.
  */
-import type { ChartSpec, ChatMessage, ChartType } from "@/lib/types";
+import type { ChartSpec, ChatMessage, ChartType, WhatIf } from "@/lib/types";
+import { FORECAST_PERIOD_TEXT } from "@/lib/types";
 import { allMerchantTypes, listCategories } from "@/lib/data";
+import { resolveTarget } from "@/lib/insights/targets";
+import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { runTool } from "./tools";
 
 /** Run a tool and return its data (what the AI would see). */
@@ -36,6 +39,44 @@ const plus = (n: number) => `{+${eur(n)}}`;
 const minus = (n: number) => `{-${eur(n)}}`;
 const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
 
+/**
+ * Words that open the what-if view (what_if_spending).
+ * WHY "save if" / "reduce" are not here: they still reach the older what_if sub-tool below
+ * (per-month / per-year saving), so both can be tried in mock mode.
+ */
+const WHAT_IF_WORDS = ["what if", "spend less", "cut", "forecast", "predict", "keep spending"];
+
+/** The coach's sentence for a what-if result (PLAN-what-if-forecast.md §2.5). */
+function whatIfText(w: WhatIf): string {
+  const what = w.target.label.toLowerCase();
+  const P = FORECAST_PERIOD_TEXT;
+  const next = w.months === 1 ? "next month" : `in the next ${P[w.months]}`;
+  if (w.emptyReason === "short_history") {
+    return "You have less than a month of spending history — not enough data yet to make a prediction.";
+  }
+  if (w.emptyReason === "no_spending") {
+    if (w.monthsWithData.length === 0) {
+      return `I couldn't find any spending on ${what} in your history, so there's not enough data yet to predict it.`;
+    }
+    const last = w.months === 1 ? "last month" : `in the last ${P[w.months]}`;
+    return (
+      `You didn't spend on ${what} ${last}, so there's not enough data yet for a ${w.months}-month prediction. ` +
+      `Switch to ${P[w.monthsWithData[0]]} to see one.`
+    );
+  }
+  // WHY every option: the user can then compare 5 / 10 / 20 % without tapping each circle.
+  const lines = w.cutOptions.map((o) => `• ${o.cutPct}% less → save about ${plus(o.savingEur)}`);
+  const save = `If you spent less, you'd save:\n${lines.join("\n")}`;
+  if (w.status === "fallback" && w.basedOnMonths) {
+    return (
+      `If you keep spending on ${what} at the same pace, you'd spend about ${minus(w.noChangeEur)} ${next} ` +
+      `(based on your last ${P[w.basedOnMonths]} — there isn't ${P[w.months]} of history yet). ${save}`
+    );
+  }
+  const last = w.months === 1 ? "last month" : `over the last ${P[w.months]}`;
+  return `If you keep spending on ${what} like you did ${last}, you'd spend about ${minus(w.noChangeEur)} ${next}. ${save}`;
+}
+
 export function mockReply(history: ChatMessage[]): ChatMessage {
   const q = (history.at(-1)?.text ?? "").toLowerCase();
   const reply = (text: string, ...charts: (ChartSpec | undefined)[]): ChatMessage => ({
@@ -43,6 +84,21 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     text: `[mock AI] ${text}`,
     charts: charts.filter((c): c is ChartSpec => !!c),
   });
+  // WHY first: otherwise "cut taxis by 20%" would be caught by the category branch below.
+  if (has(q, ...WHAT_IF_WORDS)) {
+    // WHY these regexes: "cut by 30%" must set the % and must NOT select 3 months.
+    const pct = q.match(/(\d{1,2})\s*%/)?.[1];
+    const months = /\b(6|six)\s*months?\b|half a year/.test(q)
+      ? 6
+      : /\b(3|three)\s*months?\b|quarter/.test(q)
+        ? 3
+        : undefined; // undefined → the tool's default, Month
+    // Unclear X → the customer's biggest everyday group (same as the chip).
+    const target = (resolveTarget(q) ?? getDefaultTarget()).label;
+    const w = runTool("what_if_spending", { category: target, months, cut_pct: pct }).whatIf;
+    if (w) return { ...reply(whatIfText(w)), whatIf: w };
+  }
+
   // Category or merchant type mentioned? ("taxis" matches "Taxi" via its stem)
   const category = [...listCategories(), ...allMerchantTypes()].find((c) =>
     q.includes(c.toLowerCase()),
@@ -231,7 +287,8 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
 
   return reply(
     'I\'m a placeholder until the real AI is connected. Try: "what kind of spender am I", ' +
-      '"where does my money slip away", "how much could I save if I cut restaurants by 20%", ' +
+      '"where does my money slip away", "what if I spend 20% less on restaurants", ' +
+      '"how much could I save if I reduce taxi by 20%", ' +
       '"what\'s safe to spend", "my bills", "surprise costs", "compared to people my age", ' +
       '"my income", "my balance", "biggest purchases", "compare months", "my baskets", ' +
       '"spending trend", "spending calendar", "my home loan", or a category like "taxi".',
