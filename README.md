@@ -1,13 +1,13 @@
-# Sentti (Junction 2026 × S-Bank, team sigsegv-magic)
+# Sentti (Junction 2026 × S-Bank, team SIGSEGV CREW)
 
 Chat with your own money. Sentti is a mobile-first web app where an AI coach answers questions about your
 spending, using the **3 spending types**:
 
-| Spending type           | What it means                                     | Examples                             |
-| ----------------------- | ------------------------------------------------- | ------------------------------------ |
-| **Regular**             | Must-pays that come every month, about the same   | Rent, electricity, groceries, bus    |
-| **Surprising expenses** | Needed, but the timing or amount is a surprise    | Dentist, broken washing machine      |
-| **Everyday spending**   | Small choices that slip away and add up           | Coffees, takeaway, taxis, cinema     |
+| Spending type           | What it means                                   | Examples                          |
+| ----------------------- | ----------------------------------------------- | --------------------------------- |
+| **Regular**             | Must-pays that come every month, about the same | Rent, electricity, groceries, bus |
+| **Surprising expenses** | Needed, but the timing or amount is a surprise  | Dentist, broken washing machine   |
+| **Everyday spending**   | Small choices that slip away and add up         | Coffees, takeaway, taxis, cinema  |
 
 In the code the spending types are still called `Basket` (`mandatory_regular`, `mandatory_irregular`,
 `everyday`). The names people see come from `BASKET_LABELS` in `lib/types.ts`; which category goes to which
@@ -50,12 +50,12 @@ shown with a yellow "mock AI" badge). Everything works without any keys.
 
 Click the small **🛠** in the far bottom-right corner of the browser window (or open these while `npm run dev` runs):
 
-| Page                                    | What's there                                                                                                                      |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| http://localhost:3000/dev               | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
+| Page                                    | What's there                                                                                                                        |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| http://localhost:3000/dev               | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where   |
 | http://localhost:3000/data              | 8 example transactions, the 3 spending types, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data |
 | http://localhost:3000/customer_profiles | All demo customers grouped by kind of spender (home-loan customers listed first), with a **Use in app** button                      |
-| http://localhost:3000/api/health        | Is the data loading? Which AI settings are active?                                                                                |
+| http://localhost:3000/api/health        | Is the data loading? Which AI settings are active?                                                                                  |
 
 Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/DevButton.tsx`.
 
@@ -100,12 +100,12 @@ The data and the API key never leave the server.
 
 Each person works mostly in their own folder → fewer merge conflicts.
 
-| Area         | Folder                  | First tasks                                                                                                                     |
-| ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Area         | Folder                  | First tasks                                                                                                                            |
+| ------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Data**     | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → spending type table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
-| **AI**       | `lib/ai/`               | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`)                              |
-| **UI**       | `app/`, `components/`   | Coach chat look & feel, chart cards, Home and Week pages. Theme colors in `app/globals.css`                                      |
-| **Insights** | `lib/insights/`         | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md`                                    |
+| **AI**       | `lib/ai/`               | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`)                                     |
+| **UI**       | `app/`, `components/`   | Coach chat look & feel, chart cards, Home and Week pages. Theme colors in `app/globals.css`                                            |
+| **Insights** | `lib/insights/`         | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md`                                           |
 
 **`lib/types.ts` is the shared contract.** Changing it affects everyone → tell the team first.
 
@@ -156,11 +156,13 @@ Set `AI_MODE=mock` to switch back without deleting your settings.
 ⚠️ The model must support **tool calling** (function calling). Test this first.
 
 **Our Modal server** (`ai-server/qwen_vllm.py`, Qwen3.6-35B-A3B on 1× H100, always on):
+
 ```bash
 modal deploy ai-server/qwen_vllm.py   # deploy / update
 modal app stop money-coach-llm        # stop the GPU bill
 modal app logs money-coach-llm        # server logs
 ```
+
 (`money-coach-llm` is the deployed Modal app's name from before the Sentti rename; leave it as is.)
 Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the AI person.
 
@@ -198,11 +200,11 @@ Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the 
 
 | Make         | What it does                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `make`       | List these commands                           |
+| `make`       | List these commands                                                   |
 | `make dev`   | Run the app (installs packages only when they are missing or changed) |
-| `make phone` | Same, reachable from a phone on the same wifi |
-| `make check` | Typecheck + lint — run before pushing         |
-| `make data`  | Raw CSVs in `data/raw/` → `data/demo/`        |
+| `make phone` | Same, reachable from a phone on the same wifi                         |
+| `make check` | Typecheck + lint — run before pushing                                 |
+| `make data`  | Raw CSVs in `data/raw/` → `data/demo/`                                |
 
 The npm scripts underneath:
 

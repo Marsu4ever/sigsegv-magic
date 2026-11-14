@@ -4,7 +4,7 @@
  * Data: GET /api/insights → lib/insights/proactive.ts. The screen never makes up an
  * observation: every card, number and suggestion comes from that endpoint.
  *
- * A card (compact, swipe for more): category + severity on top, one line with the number
+ * A card (compact, one at a time, swipe left / right for the next — SwipeCarousel): category + severity on top, one line with the number
  * ("Restaurants up 274 % this month"), and the suggested action in a few words.
  * Tap → a sheet with the explanation, the numbers, "Try this", why it was noticed, and
  * "Ask the coach about this" (the chat starts with this insight as context).
@@ -21,6 +21,7 @@ import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { LessonProgress } from "@/components/education/LessonProgress";
+import { SwipeCarousel } from "@/components/ui/SwipeCarousel";
 
 const KIND: Record<InsightKind, { label: string; icon: IconName }> = {
   risk: { label: "Coming up", icon: "alert" },
@@ -244,17 +245,13 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
     return (
       <CollapsibleSection id="insights" title={title}>
         <SkeletonGroup>
-          <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 pb-1">
-            {[0, 1].map((i) => (
-              <div key={i} className="flex w-[80%] shrink-0 items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
-                <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-2.5 w-1/2" />
-                  <Skeleton className="h-3.5 w-4/5" />
-                  <Skeleton className="h-2.5 w-2/5" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-2.5 w-1/2" />
+              <Skeleton className="h-3.5 w-4/5" />
+              <Skeleton className="h-2.5 w-2/5" />
+            </div>
           </div>
         </SkeletonGroup>
       </CollapsibleSection>
@@ -281,11 +278,16 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
       {visible.length === 0 ? (
         <AllClear hiddenCount={hiddenCount} onShow={showHidden} />
       ) : (
-        // WHY scroll-px-4: tiles snap in line with the page edge; scrollbar hidden (swipe is enough).
-        <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {visible.map((i) => (
-            <div key={i.id} className="relative w-[80%] shrink-0 snap-start rounded-2xl border border-line bg-surface">
-              <button type="button" onClick={() => setOpen(i)} className="flex w-full items-start gap-3 p-3.5 text-left">
+        // WHY one at a time (was: a sideways row of 80 % cards): the row ran past the page's
+        // right edge, and one card reads calmer. Same width as the account card above.
+        <SwipeCarousel
+          items={visible}
+          getKey={(i) => i.id}
+          label={title}
+          itemLabel="insight"
+          renderItem={(i) => (
+            <div className="relative h-full rounded-2xl border border-line bg-surface">
+              <button type="button" onClick={() => setOpen(i)} className="flex h-full w-full items-start gap-3 p-3.5 text-left">
                 <span
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                   style={{
@@ -318,8 +320,8 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
                 </button>
               )}
             </div>
-          ))}
-        </div>
+          )}
+        />
       )}
 
       {/* Money lessons: how many "guess the number" cards are done (components/education). */}

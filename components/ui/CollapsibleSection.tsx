@@ -104,7 +104,9 @@ export function CollapsibleSection({
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
         onTransitionEnd={(e) => e.target === e.currentTarget && setSliding(false)}
       >
-        <div className={`min-h-0 ${open && !sliding ? "" : "overflow-hidden"}`} inert={!open}>
+        {/* WHY min-w-0: a grid item is at least as wide as its content by default, so a wide
+            row inside (the old insight cards) stretched the section past the page edge. */}
+        <div className={`min-h-0 min-w-0 ${open && !sliding ? "" : "overflow-hidden"}`} inert={!open}>
           <div className="pt-2">{children}</div>
         </div>
       </div>
