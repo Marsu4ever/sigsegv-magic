@@ -99,6 +99,73 @@ function onScreen(m: ChatMessage): string {
 }
 
 /** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
+/**
+ * "Couldn't get that number" sentences, from the app or copied by the model.
+ * WHY strip them (from history AND replies): Qwen copies its own earlier replies, so one such
+ * sentence turned into the same "I couldn't get that exact number…" on every answer (14 Nov).
+ */
+const COULDNT_GET = /(Sorry, )?I couldn'?t (get|work) (that|those)[^.!?\n]{0,30} from your data[.!]?\s*/gi;
+
+function withoutCouldntGet(text: string): string {
+  return text.replace(COULDNT_GET, "").trim();
+}
+
+/** Something besides the follow-up question and [[button]]? */
+function hasStatement(text: string): boolean {
+  return text
+    .split("\n")
+    .filter((l) => !/^\s*\[\[.*\]\]\s*$/.test(l))
+    .join(" ")
+    .split(/(?<=[.!?])\s+/)
+    .some((sentence) => sentence.trim() && !sentence.trim().endsWith("?") && !/\[\[/.test(sentence));
+}
+
+// ─── No repeated follow-up buttons ───────────────────────────────────────
+
+/** Words that don't say WHAT is offered ("Show me how I could save" → "save"). */
+const FILLER = new Set(
+  "show me my the a an i you we how where what could would can to on for of in and or see let s want more"
+    .split(" "),
+);
+
+/** "Show me restaurant savings" → {"restaurant", "sav"} (lowercase, rough plural/verb ending cut). */
+function offerWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-zåäö0-9 ]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w && !FILLER.has(w))
+      .map((w) => w.replace(/(ings|ing|es|s|e)$/, "")),
+  );
+}
+
+/** Same offer? Equal content words, or 80 % overlap. */
+function sameOffer(a: Set<string>, b: Set<string>): boolean {
+  if (a.size === 0 || b.size === 0) return false;
+  const shared = [...a].filter((w) => b.has(w)).length;
+  return shared / new Set([...a, ...b]).size >= 0.8;
+}
+
+/**
+ * Removes the [[button]] (and the question before it) when it offers something the user
+ * already asked or tapped in this chat. WHY in code: Qwen kept offering "Show me how I could
+ * save" after the user had tapped it, so the chat looped (14 Nov). No button is fine.
+ */
+function withoutRepeatedOffer(text: string, history: ChatMessage[]): string {
+  const button = text.match(/\[\[(.+?)\]\]/);
+  if (!button) return text;
+  const offer = offerWords(button[1]);
+  const asked = history.filter((m) => m.role === "user").map((m) => offerWords(m.text));
+  if (!asked.some((words) => sameOffer(offer, words))) return text;
+  console.log(`[ai] follow-up "${button[1]}" was already asked — button removed`);
+  const withoutButton = text.replace(/\s*\[\[.+?\]\]\s*/g, " ").trim();
+  // Drop the matching question too ("Want to see how you could save?"), if it ends the reply.
+  const sentences = withoutButton.split(/(?<=[.!?])\s+/);
+  if (sentences.length > 1 && sentences[sentences.length - 1].trim().endsWith("?")) sentences.pop();
+  return sentences.join(" ").trim();
+}
+
 function withoutOnScreenNotes(text: string): string {
   return text.replace(/\s*\[On screen:[^\]\n]*\]/g, "").trim();
 }
@@ -138,7 +205,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
     // data would waste tokens. onScreen() names them in one line instead.
     ...history.map((m): LlmMessage => ({
       role: m.role,
-      content: m.role === "assistant" ? m.text + onScreen(m) : m.text,
+      content: m.role === "assistant" ? withoutCouldntGet(m.text) + onScreen(m) : m.text,
     })),
   ];
 
@@ -149,6 +216,9 @@ export async function runChat(history: ChatMessage[]): Promise<{
   // (the user's own, or the coach's from earlier turns — checked when they were written).
   const knownNumbers: number[] = history.flatMap((m) => euroAmounts(m.text).map((a) => a.value));
   let nudged = false;
+  // The answer before the nudge. WHY: Qwen sometimes returns nothing after a forced tool call;
+  // then this answer (minus any unverified amounts) is used instead of an empty reply.
+  let firstAnswer = "";
   // WHY force a tool after the nudge: Qwen ignored the plain "[App check]" message and wrote
   // the same made-up €89.64 again (14.94 × 6 from its own earlier text).
   let forceTool = false;
@@ -187,31 +257,30 @@ export async function runChat(history: ChatMessage[]): Promise<{
 
     const toolCalls = (msg.tool_calls ?? []).filter((c) => c.type === "function");
 
-    // Made-up numbers → ask once to redo the answer with tools. Two checks:
-    // 1. digits but no tool call at all this turn;
-    // 2. a € amount that is in no tool result of this turn and nowhere earlier in the chat.
+    // Made-up numbers → ask once to redo the answer with tools:
+    // a € amount that is in no tool result of this turn and nowhere earlier in the chat.
+    // WHY not "any digit without a tool call" (removed): it fired on real numbers repeated from
+    // earlier in the chat, the forced retry came back empty, and the user got a blank reply.
     // WHY: Qwen invented "Cafes €48.20" (it had called show_chart only, which used to return no
     // data) and "€142.30" (after what_if returned an error) for CUST01350, who never paid at a
     // cafe. A false alarm only costs one extra round.
     if (toolCalls.length === 0 && !nudged) {
       const text = msg.content ?? "";
-      const noTool = toolCallsThisTurn === 0 && /\d/.test(text);
       const invented = unsupportedAmounts(text, knownNumbers);
-      if (noTool || invented.length > 0) {
+      if (invented.length > 0) {
         nudged = true;
-        forceTool = true;
+        firstAnswer = text;
+        // WHY no forceTool (tool_choice "required") any more: on the Modal Qwen server the forced
+        // retry came back EMPTY 3 times out of 3 (14 Nov logs). A plain, specific nudge works.
         console.warn(
-          `[ai] round ${round}: ${noTool ? "numbers but no tool call" : `amounts not from any tool: ${invented.join(", ")}`} — asking again`,
+          `[ai] round ${round}: amounts not from any tool: ${invented.join(", ")} — asking again`,
         );
         messages.push(msg, {
           role: "user",
-          content: noTool
-            ? "[App check, not from the user] Your answer has numbers, but you called no tool in this turn, " +
-              "so they may be wrong. Call the right tool(s) now and write the answer again using only " +
-              "numbers from their results."
-            : `[App check, not from the user] These amounts are in no tool result: ${invented.join(", ")}. ` +
-              "Call the tool that returns them, or write the answer again without them. Use only " +
-              "numbers from tool results.",
+          content:
+            `[App check, not from the user] These amounts are in no tool result: ${invented.join(", ")}. ` +
+            "Call the tool that returns them, or write the answer again without them. Use only " +
+            "numbers from tool results. Never mention tools in your answer.",
         });
         continue;
       }
@@ -219,28 +288,39 @@ export async function runChat(history: ChatMessage[]): Promise<{
 
     // No tool calls → the model has written its final answer.
     if (toolCalls.length === 0) {
-      let text = withoutOnScreenNotes(msg.content ?? "");
+      // Never send an empty reply: fall back to the answer from before the nudge.
+      const empty = !(msg.content ?? "").trim();
+      if (empty && firstAnswer) console.warn("[ai] retry came back empty — using the first answer");
+      let text = withoutCouldntGet(
+        withoutOnScreenNotes(empty && firstAnswer ? firstAnswer : (msg.content ?? "")),
+      );
       const stillInvented = unsupportedAmounts(text, knownNumbers);
       if (stillInvented.length > 0) {
         console.warn(
           `[ai] warning: final answer still has amounts not from a tool: ${stillInvented.join(", ")} — sentences dropped`,
         );
-        text =
-          dropSentencesWith(text, stillInvented) ||
-          "Sorry, I couldn't get that number from your data. Could you ask in a different way?";
+        // WHY no apology opener: Qwen copied it into every later answer. If only the follow-up
+        // question is left, say so once, without a button (a button would invite a loop).
+        const rest = dropSentencesWith(text, stillInvented).trim();
+        text = hasStatement(rest)
+          ? rest
+          : "Sorry, I couldn't work that out from your data. Try asking about one habit, like restaurants or fast food.";
       } else if (toolCallsThisTurn === 0 && /\d/.test(text)) {
         console.warn("[ai] warning: final answer has numbers but still no tool call");
       }
       console.log(
         `[ai] round ${round}: final answer in ${ms(start)} (${(msg.content ?? "").length} chars)`,
       );
-      if (!msg.content) console.warn("[ai] warning: final answer is empty");
+      if (!text.trim()) {
+        console.warn("[ai] warning: final answer is empty — sending a short fallback");
+        text = "Sorry, I couldn't work that out from your data. Try asking in a different way.";
+      }
       return {
         reply: {
           role: "assistant",
           // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
           // sure (lib/noDashes.ts, lib/euroAfter.ts).
-          text: euroAfter(noLongDashes(text)),
+          text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))),
           // No chart from the model → safety net adds one, unless the what-if
           // view opens (that panel already is the visual).
           charts: charts.length > 0 || whatIf ? charts : fallbackCharts(history),
