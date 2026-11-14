@@ -264,15 +264,94 @@ function DayBars({ day, limit }: { day: DaySpending; limit?: number }) {
 }
 
 const HOVER_TOP = 7; // purchases shown in the hover popup
-const LIST_STEP = 7; // purchases per "page" in the click list
+const LIST_STEP = 7; // categories per "page" in the click list
 
-/** Full list after a click: 7 purchases, "Show more" opens 7 more below. */
+/** Full list after a click: 7 categories, "Show more" opens 7 more below. Tap one for its payments. */
 function DayList({ day }: { day: DaySpending }) {
   const [shown, setShown] = useState(LIST_STEP);
-  const left = day.transactions.length - shown;
+  const [open, setOpen] = useState<string | null>(null); // category whose payments are shown
+  // WHY grouped: the data has no receipt lines, so "what did I buy" = the
+  // category's payments. One row per category, biggest total first; tap it
+  // to see each payment's time and store type.
+  // WHY no Map.groupBy / toSorted: they crash on iPhones older than iOS 17.4.
+  const byCategory = new Map<string, DaySpending["transactions"]>();
+  for (const t of day.transactions) {
+    byCategory.set(t.category, [...(byCategory.get(t.category) ?? []), t]);
+  }
+  const groups = [...byCategory]
+    .map(([category, txs]) => ({
+      category,
+      txs: [...txs].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+      total: txs.reduce((s, t) => s + t.amountEur, 0),
+      basket: txs[0].basket,
+    }))
+    .sort((a, b) => b.total - a.total);
+  const max = groups[0]?.total || 1;
+  const left = groups.length - shown;
   return (
     <>
-      <DayBars day={day} limit={shown} />
+      <ul className="space-y-1 text-sm">
+        {groups.slice(0, shown).map((g) => {
+          const isOpen = open === g.category;
+          return (
+            <li key={g.category}>
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : g.category)}
+                aria-expanded={isOpen}
+                className="relative w-full overflow-hidden rounded-md px-2 py-1.5 text-left transition-colors hover:bg-line/40"
+              >
+                <span
+                  className="absolute inset-y-0 left-0 rounded-md opacity-25"
+                  style={{
+                    width: `${Math.max(4, (g.total / max) * 100)}%`,
+                    background: BASKET_DOT[g.basket],
+                  }}
+                />
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: BASKET_DOT[g.basket] }}
+                      title={BASKET_LABELS[g.basket]}
+                    />
+                    <span className="truncate">{g.category}</span>
+                    {g.txs.length > 1 && (
+                      <span className="shrink-0 rounded-full bg-background px-1.5 text-[11px] text-muted tabular-nums">
+                        ×{g.txs.length}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 font-medium tabular-nums">
+                    {eur(g.total)}
+                    <Icon
+                      name="chevron"
+                      size={14}
+                      className={`text-muted transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    />
+                  </span>
+                </span>
+              </button>
+              {isOpen && (
+                // Each payment in this category, in time order.
+                <ul className="fade-up mt-1 mb-2 ml-3.5 space-y-0.5 border-l-2 border-line pl-3">
+                  {g.txs.map((t, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 py-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="w-10 shrink-0 text-xs text-muted tabular-nums">
+                          {t.time ?? "–"}
+                        </span>
+                        <span className="truncate">{t.merchantType ?? "Payment"}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums">{eur(t.amountEur)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       {(left > 0 || shown > LIST_STEP) && (
         <button
           type="button"
@@ -619,7 +698,7 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
 }
 
 /**
- * The clicked day's purchases, biggest first: 7 shown, "Show more" adds 7.
+ * The clicked day's spending by category, biggest first: 7 shown, "Show more" adds 7.
  */
 function DayPanel({
   panelRef,
