@@ -16,7 +16,7 @@ export function GoalStrip({ view }: { view: GoalView | null }) {
   if (!view) return null; // no skeleton: it's one line, and it shouldn't push the page around twice
 
   const g = view.goal;
-  // Without a goal: GoalStartRow, lower on Home (DECISIONS.md #53c).
+  // Without a goal: GoalStartRow, lower on Home (DECISIONS.md #60c).
   if (!g) return null;
 
   const m = view.mission;
@@ -63,7 +63,7 @@ export function GoalStrip({ view }: { view: GoalView | null }) {
 /**
  * A quiet "Set a goal" line on Home when there is no goal. Opens the setup sheet on /week.
  * WHY plain text, low on the page (not a card up top): it should be findable, but Home's
- * main job is balance and safe to spend (DECISIONS.md #53c).
+ * main job is balance and safe to spend (DECISIONS.md #60c).
  */
 export function GoalStartRow({ view }: { view: GoalView | null }) {
   if (!view || view.goal) return null;

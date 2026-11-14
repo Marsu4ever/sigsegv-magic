@@ -15,7 +15,7 @@
  *      "Sparks joy? ✨" chip that turns ALL of that habit's marbles shiny gold
  *      (skip and joy exclude each other — you don't skip what you love)
  *
- * SAVING GOAL (DECISIONS.md #53c): "Sparks joy" is saved with the goal (POST /api/goal setJoy),
+ * SAVING GOAL (DECISIONS.md #60c): "Sparks joy" is saved with the goal (POST /api/goal setJoy),
  * so it lasts and weekly missions never ask you to cut what you love. With a goal set, a habit
  * that can be this week's mission gets "Make it this week's mission →" (full screen).
  *

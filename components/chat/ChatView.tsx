@@ -13,6 +13,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useGoal } from "@/components/goal/api";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { CountUp } from "@/components/ui/CountUp";
+import { tapHaptic } from "@/lib/haptic";
 import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
@@ -103,11 +105,16 @@ export function ChatView() {
   // WHY wait for both before showing the start screen (skeleton meanwhile): they used to
   // pop in one by one after the page had drawn, pushing everything down.
   const [startReady, setStartReady] = useState(false);
+  // Greeting by the time of day + one real number ("kept so far this month").
+  const greeting = useGreeting();
+  const [glance, setGlance] = useState<Glance | null>(null);
   useEffect(() => {
     const insights = fetch("/api/insights")
       .then((res) => (res.ok ? res.json() : null))
       .then((json: InsightsResponse | null) => {
-        const help = json?.insights.find((i) => i.kind === "save_help");
+        // WHY by id, not kind: the gentler 10 % "save-tip" is for people who already save;
+        // the opener is only for those who keep (almost) nothing.
+        const help = json?.insights.find((i) => i.id === "save-help");
         if (!help) return;
         // WHY the hook, not the full detail: one fact and one number, then the offer.
         setOpener({
@@ -116,6 +123,12 @@ export function ChatView() {
         });
       })
       .catch((err) => console.error("[insights]", err));
+
+    // Greeting's number ("kept so far this month"), loaded with the rest of the start screen.
+    const glanceP = fetch("/api/glance")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: Glance | null) => json && setGlance(json))
+      .catch((err) => console.error("[glance]", err));
 
     // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
     // On failure the chip is just left out — the other suggestions still work.
@@ -127,7 +140,7 @@ export function ChatView() {
       })
       .catch((err) => console.error("[what-if suggestion]", err)); // browser DevTools console
 
-    Promise.allSettled([insights, chip]).then(() => setStartReady(true));
+    Promise.allSettled([insights, chip, glanceP]).then(() => setStartReady(true));
   }, []);
 
   // Saving goal chip (lib/goals): start one, or ask how it's going. Added once the goal has loaded.
@@ -210,11 +223,17 @@ export function ChatView() {
     return () => window.removeEventListener(CHAT_RESET_EVENT, check);
   }, []);
 
-  async function send(text: string) {
+  /** `context`: a coach message to start from, e.g. an insight opened on Home (?ctx=). */
+  async function send(text: string, context?: string) {
     setSuggestionsOpen(false);
     // WHY: the opener becomes part of the chat once the user answers, so the AI
-    // knows what it offered (and a typed "yes" works).
-    const base = messages.length === 0 && opener ? [opener] : messages;
+    // knows what it offered (and a typed "yes" works). An insight from Home replaces it:
+    // the coach then continues from what the card said, with the same numbers.
+    const base: ChatMessage[] = context
+      ? [...messages, { role: "assistant", text: context }]
+      : messages.length === 0 && opener
+        ? [opener]
+        : messages;
     const next: ChatMessage[] = [...base, { role: "user", text }];
     setMessages(next);
     setLoading(true);
@@ -263,15 +282,18 @@ export function ChatView() {
     }
   }
 
-  // A question handed over from another tab, e.g. /chat?ask=… from the Home loan tab.
+  // A question handed over from another tab, e.g. /chat?ask=… from the Home loan tab,
+  // optionally with ?ctx=… (an insight's title + explanation, from Home's coach insights).
   useEffect(() => {
-    const ask = new URLSearchParams(window.location.search).get("ask");
+    const params = new URLSearchParams(window.location.search);
+    const ask = params.get("ask");
+    const ctx = params.get("ctx") ?? undefined;
     if (!ask) return;
     // WHY a timer + cleanup: React dev mode runs effects twice; the first timer
     // is cancelled, so the question is asked exactly once.
     const id = setTimeout(() => {
       window.history.replaceState(null, "", "/chat"); // a reload shouldn't ask again
-      send(ask);
+      send(ask, ctx);
     }, 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on open
@@ -301,9 +323,11 @@ export function ChatView() {
           <div className="mx-auto max-w-md space-y-5 px-1 pt-6">
             <div className="flex flex-col items-center text-center">
               <LogoMark size={52} />
-              <h2 className="mt-3 text-xl font-semibold">Hi! I&apos;m your money coach.</h2>
+              <h2 className="mt-3 text-xl font-semibold">{greeting}</h2>
+              {/* One real number up front, so the app feels like it knows you. */}
+              {glance && <GlanceLine glance={glance} />}
               <p className="mt-1 text-sm text-muted">
-                Ask anything — I answer with your real numbers.
+                I&apos;m your money coach. Ask anything, I answer with your real numbers.
               </p>
             </div>
 
@@ -320,16 +344,25 @@ export function ChatView() {
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
                   {suggestions.map((s) => (
                     <li key={s}>
+                      {/* Hover / press: soft green row, the icon tile fills green, the arrow
+                          nudges right. WHY active: too: phones have no hover. */}
                       <button
                         type="button"
-                        onClick={() => send(s)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-background active:bg-background"
+                        onClick={() => {
+                          tapHaptic();
+                          send(s);
+                        }}
+                        className="group flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 hover:bg-accent/5 active:bg-accent/10"
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent transition-all duration-200 group-hover:bg-accent group-hover:text-accent-foreground group-active:scale-90 group-active:bg-accent group-active:text-accent-foreground">
                           <Icon name={suggestionIcon(s)} size={17} />
                         </span>
-                        <span className="flex-1">{s}</span>
-                        <Icon name="chevron" size={16} className="text-muted" />
+                        <span className="flex-1 transition-colors group-hover:text-accent">{s}</span>
+                        <Icon
+                          name="chevron"
+                          size={16}
+                          className="text-muted transition-transform duration-200 group-hover:translate-x-1 group-hover:text-accent group-active:translate-x-1.5"
+                        />
                       </button>
                     </li>
                   ))}
@@ -380,8 +413,11 @@ export function ChatView() {
               key={s}
               type="button"
               disabled={loading}
-              onClick={() => send(s)}
-              className="shrink-0 whitespace-nowrap rounded-full border border-line bg-background px-3 py-1.5 text-sm disabled:opacity-40"
+              onClick={() => {
+                tapHaptic();
+                send(s);
+              }}
+              className="shrink-0 whitespace-nowrap rounded-full border border-line bg-background px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent active:scale-95 disabled:opacity-40"
             >
               {s}
             </button>
@@ -397,5 +433,50 @@ export function ChatView() {
         suggestionsOpen={suggestionsOpen}
       />
     </div>
+  );
+}
+
+// ─── Greeting ────────────────────────────────────────────────────────────
+
+/** This month so far, from /api/glance. */
+type Glance = { keptEur: number; spentEur: number };
+
+/**
+ * "Good morning / afternoon / evening" by the phone's clock.
+ * WHY after mount: the server doesn't know the user's time zone, so the first render
+ * says "Hi!" and the real greeting follows (no hydration mismatch).
+ */
+function useGreeting(): string {
+  const [text, setText] = useState("Hi!");
+  useEffect(() => {
+    const h = new Date().getHours();
+    const id = setTimeout(
+      () => setText(h < 5 ? "Good evening!" : h < 12 ? "Good morning!" : h < 18 ? "Good afternoon!" : "Good evening!"),
+      0,
+    );
+    return () => clearTimeout(id);
+  }, []);
+  return text;
+}
+
+const eur0 = (n: number) => `${Math.round(n).toLocaleString("fi-FI")} €`;
+
+/** "You've kept 516 € so far this month 🌱" (or what's been spent, if nothing is kept yet). */
+function GlanceLine({ glance }: { glance: Glance }) {
+  const kept = glance.keptEur > 0;
+  return (
+    <p className="mt-1 text-[15px]">
+      {kept ? "You've kept " : "You've spent "}
+      <span className={`font-semibold tabular-nums ${kept ? "text-money-in" : ""}`}>
+        <CountUp
+          value={kept ? glance.keptEur : glance.spentEur}
+          format={eur0}
+          duration={900}
+          delay={150}
+          fixedWidth
+        />
+      </span>
+      {kept ? " so far this month 🌱" : " so far this month"}
+    </p>
   );
 }

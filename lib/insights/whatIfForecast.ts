@@ -347,7 +347,7 @@ export function getWhatIf(
   cutPct = DEFAULT_CUT_PCT,
 ): WhatIf {
   const w = buildWhatIf(getTransactions(), getDataToday(), getDataFirstDay(), target, months, cutPct);
-  // Saving goal set → "≈ N days closer to Lisbon" under "You'd save" (DECISIONS.md #53c).
+  // Saving goal set → "≈ N days closer to Lisbon" under "You'd save" (DECISIONS.md #60c).
   const impact = w.savingEur > 0 ? goalImpact(w.savingEur) : undefined;
   return impact ? { ...w, goalImpact: impact } : w;
 }

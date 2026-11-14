@@ -3,7 +3,7 @@
  * "This week" tab — simple overview, no AI. Owner: UI person.
  * Data comes from GET /api/week (lib/data/index.ts → getWeekSummary).
  *
- * TOP: the saving goal + this week's mission (components/goal/GoalSection.tsx, DECISIONS.md #53).
+ * TOP: the saving goal + this week's mission (components/goal/GoalSection.tsx, DECISIONS.md #60).
  * WHY here: a mission is a weekly thing, and this tab is where you look at your week.
  *
  * NOTE: shows the LAST 7 DAYS in the dataset (ending on its latest day), not the
@@ -33,11 +33,13 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from 
 import { fiDate, formatValue } from "@/components/charts/format";
 import Link from "next/link";
 import { DevHeaderButton } from "@/components/DevButton";
+import { CountUp } from "@/components/ui/CountUp";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 import { GoalSection } from "@/components/goal/GoalSection";
 
-const TYPE_COLOR: Record<Basket, string> = {
+/** Basket colours, also used by the Spending breakdown on Home. */
+export const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
   mandatory_irregular: "var(--accent)", // the app's green
   everyday: "color-mix(in srgb, var(--accent) 62%, white)", // light green
@@ -50,7 +52,7 @@ const TRACK = "color-mix(in srgb, var(--accent) 14%, var(--surface))";
 // heavy; Regular / Irregular / Everyday says the same on a phone.
 const TYPE_LABEL: Record<Basket, string> = {
   mandatory_regular: "Regular",
-  mandatory_irregular: "Irregular",
+  mandatory_irregular: "Surprising expenses",
   everyday: "Everyday",
 };
 
@@ -82,7 +84,7 @@ export function WeekView() {
 
   return (
     <div className="h-full overflow-y-auto" onClick={focus ? clearOnOutsideTap : undefined}>
-      {/* WHY "This week": the page holds your saving goal and mission too (DECISIONS.md #53); the
+      {/* WHY "This week": the page holds your saving goal and mission too (DECISIONS.md #60); the
           7-day numbers below get their own label with the dates. On phones the 🛠 team-hub link
           sits here (components/DevButton.tsx). */}
       <header className="flex items-center justify-between gap-4 border-b border-line bg-surface px-4 py-3">
@@ -151,7 +153,7 @@ export function Hero({
       <div className="text-center">
         <p className="text-xs text-muted">Spent</p>
         <p className="text-4xl font-bold tracking-tight text-accent tabular-nums">
-          {formatValue(data.totalSpentEur, "€")}
+          <CountUp value={data.totalSpentEur} format={(n) => formatValue(n, "€")} duration={800} fixedWidth />
         </p>
       </div>
 

@@ -38,7 +38,10 @@ export function ActivityView() {
   const touch = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    load()
+    // ?month=YYYY-MM opens that month (e.g. from Home's spending breakdown); the API falls
+    // back to the latest month for anything it doesn't recognise.
+    const month = new URLSearchParams(window.location.search).get("month") ?? undefined;
+    load(month)
       .then(setData)
       .catch((err) => setError(String(err.message ?? err)));
   }, []);

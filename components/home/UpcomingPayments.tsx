@@ -24,17 +24,22 @@ function whenText(days: number): string {
 /** WHY 5: enough to plan the coming weeks without turning Home into a long list. */
 const SHOWN = 5;
 
-export function UpcomingPayments({ items }: { items: UpcomingPayment[] }) {
+export function UpcomingPayments({
+  items,
+  max = SHOWN,
+  empty = "No regular bills expected in the next month.",
+}: {
+  items: UpcomingPayment[];
+  /** How many rows at most (Home: 5; the safe-to-spend sheet shows all). */
+  max?: number;
+  empty?: string;
+}) {
   if (items.length === 0) {
-    return (
-      <p className="rounded-2xl bg-surface p-4 text-sm text-muted shadow-sm">
-        No regular bills expected in the next month.
-      </p>
-    );
+    return <p className="rounded-2xl bg-surface p-4 text-sm text-muted shadow-sm">{empty}</p>;
   }
   return (
     <ul className="overflow-hidden rounded-2xl bg-surface shadow-sm">
-      {items.slice(0, SHOWN).map((p) => (
+      {items.slice(0, max).map((p) => (
         <li key={`${p.name}-${p.date}`} className="flex items-center gap-3 border-b border-line px-4 py-2.5 last:border-0">
           {p.kind === "automatic_saving" ? (
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">

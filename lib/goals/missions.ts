@@ -1,7 +1,7 @@
 /**
  * Weekly missions: "spend at most X € on one habit this week". SERVER ONLY. Owner: INSIGHTS person.
  *
- * WHY code builds the missions, not the AI (DECISIONS.md #53): a mission holds a baseline, a cap
+ * WHY code builds the missions, not the AI (DECISIONS.md #60): a mission holds a baseline, a cap
  * and a saving — exactly the numbers the AI has invented before (#45–#47). The habits come from
  * everyday_leaks (lib/insights/leaks.ts), the same habit cards the user sees in the Leaks chart.
  *

@@ -38,6 +38,7 @@ function ChangePill({ change, since }: { change: number; since: string }) {
       title={`Balance change since ${since}`}
     >
       {change !== 0 && <Icon name={up ? "arrow-up" : "arrow-down"} size={13} strokeWidth={2.5} />}
+      {change !== 0 && <span className="sr-only">{up ? "Up" : "Down"}</span>}
       {change === 0 ? "No change" : signed(change)}
     </span>
   );
@@ -62,6 +63,11 @@ function AccountDetails({ data, onClose }: { data: AccountSummary; onClose: () =
         <DetailRow label={`Balance on ${fiDate(data.asOf)}`} value={data.balanceEur === null ? "–" : eur(data.balanceEur)} />
         {prev && <DetailRow label={`Balance on ${fiDate(prev.endDate)}`} value={eur(prev.balanceEur)} />}
         {prev && <DetailRow label="Change this month" value={signed(prev.changeEur)} valueClass={tone(prev.changeEur)} />}
+        {/* WHY: tells the user how much history these numbers rest on (some customers have little). */}
+        <DetailRow
+          label="Transactions since"
+          value={`${monthName(`${data.list.first}-01`)} ${data.list.first.slice(0, 4)}`}
+        />
       </dl>
 
       <h3 className="mb-1.5 mt-4 px-1 text-xs font-semibold uppercase tracking-wide text-muted">
@@ -99,6 +105,14 @@ function AccountDetails({ data, onClose }: { data: AccountSummary; onClose: () =
   );
 }
 
+/** "1.–29. September" while the month is still going; "September" once it's complete. */
+function monthSoFar(from: string, to: string): string {
+  const name = monthName(from);
+  const lastDay = new Date(Date.UTC(Number(from.slice(0, 4)), Number(from.slice(5, 7)), 0)).getUTCDate();
+  const toDay = Number(to.slice(8, 10));
+  return toDay < lastDay ? `1.–${toDay}. ${name} (so far)` : name;
+}
+
 export function AccountOverview({ data }: { data: AccountSummary }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const m = data.month;
@@ -133,15 +147,18 @@ export function AccountOverview({ data }: { data: AccountSummary }) {
         </div>
         <p className="mt-3 text-4xl font-bold tracking-tight tabular-nums">{eur(data.balanceEur)}</p>
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-          {data.previousMonth && (
+          {data.previousMonth ? (
             <>
               <ChangePill change={data.previousMonth.changeEur} since={fiDate(data.previousMonth.endDate)} />
               <span className="opacity-80">since end of {monthName(data.previousMonth.endDate)}</span>
-              <span className="opacity-50" aria-hidden>
-                ·
-              </span>
             </>
+          ) : (
+            // WHY say it: an empty spot would look broken; this explains there's nothing to compare yet.
+            <span className="opacity-80">First month of history</span>
           )}
+          <span className="opacity-50" aria-hidden>
+            ·
+          </span>
           <span className="opacity-80">on {fiDate(data.asOf)}</span>
         </div>
       </div>
@@ -150,11 +167,13 @@ export function AccountOverview({ data }: { data: AccountSummary }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-surface px-4 py-3 shadow-sm">
           <p className="text-xs text-muted">Income · {month}</p>
-          <p className="mt-0.5 text-lg font-semibold tabular-nums text-money-in">{signed(m.incomeEur)}</p>
+          <p className={`mt-0.5 text-lg font-semibold tabular-nums ${tone(m.incomeEur)}`}>{signed(m.incomeEur)}</p>
+          {m.incomeEur === 0 && <p className="text-[11px] text-muted">None yet this month</p>}
         </div>
         <div className="rounded-2xl bg-surface px-4 py-3 shadow-sm">
           <p className="text-xs text-muted">Expenses · {month}</p>
-          <p className="mt-0.5 text-lg font-semibold tabular-nums text-money-out">{signed(-m.spendingEur)}</p>
+          <p className={`mt-0.5 text-lg font-semibold tabular-nums ${tone(-m.spendingEur)}`}>{signed(-m.spendingEur)}</p>
+          {m.spendingEur === 0 && <p className="text-[11px] text-muted">None yet this month</p>}
         </div>
       </div>
 
@@ -162,7 +181,7 @@ export function AccountOverview({ data }: { data: AccountSummary }) {
       <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 shadow-sm">
         <div>
           <p className="text-sm font-medium">Net cash flow</p>
-          <p className="text-xs text-muted">Income minus expenses, {month}</p>
+          <p className="text-xs text-muted">Income minus expenses, {monthSoFar(m.range.from, m.range.to)}</p>
         </div>
         <p className={`text-lg font-semibold tabular-nums ${tone(m.netEur)}`}>{signed(m.netEur)}</p>
       </div>

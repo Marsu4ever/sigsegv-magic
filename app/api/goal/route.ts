@@ -3,7 +3,7 @@
  * POST /api/goal { action, … } → applies one action (lib/goals/actions.ts), saves the state in
  *      the "goal_<customer>" cookie and returns { view: GoalView, draft?, error? }.
  *      "preview" only works out a draft (weekly amount, realistic?) and saves nothing.
- * No AI involved. See DECISIONS.md #53.
+ * No AI involved. See DECISIONS.md #60.
  */
 import { cookies } from "next/headers";
 import { connection } from "next/server";

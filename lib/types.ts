@@ -23,8 +23,9 @@ export const BASKETS: Basket[] = ["mandatory_regular", "mandatory_irregular", "e
 
 /** Human-readable basket names for the UI. */
 export const BASKET_LABELS: Record<Basket, string> = {
-  mandatory_regular: "Mandatory & regular",
-  mandatory_irregular: "Mandatory & irregular",
+  // WHY short (team call, 14 Nov): same words as the Week tab; "Mandatory &" was long and stiff.
+  mandatory_regular: "Regular",
+  mandatory_irregular: "Surprising expenses",
   everyday: "Everyday spending",
 };
 
@@ -201,6 +202,11 @@ export type ChartRow = {
 export type ChartSpec = {
   type: ChartType;
   title: string;
+  /**
+   * Which data tool + arguments made this chart (set by show_chart). Sent back with the
+   * history so a follow-up like "show it over 12 months" knows what "it" was.
+   */
+  source?: { tool: string; args: Record<string, unknown> };
   unit: string; // e.g. "€"
   rows: ChartRow[];
   /** Names of the two series when rows have value2, e.g. ["You", "Typical"]. */
@@ -273,6 +279,33 @@ export type BasketGroup = {
   }[];
 };
 
+/**
+ * One basket in the monthly spending breakdown (Home): its BasketGroup (categories → merchant
+ * types → purchases, from basketTree.ts) plus its share of all spending, how many payments,
+ * and the same days of the previous month. Added 15 Nov.
+ */
+export type SpendingBasket = BasketGroup & {
+  count: number;
+  share: number; // of the month's spending, 0–1
+  previousTotal: number | null; // null = no history for the comparison period
+  changePct: number | null; // whole %, null when there's nothing to compare with
+};
+
+/** GET /api/spending?month=YYYY-MM — the Spending breakdown on Home. Added 15 Nov. */
+export type SpendingBreakdown = {
+  month: string; // "YYYY-MM"
+  first: string; // first month with data (for ‹)
+  last: string; // latest month (for ›)
+  range: DateRange; // the month, or its first days while it's still going
+  inProgress: boolean;
+  incomeEur: number; // money in, for the income vs expenses line
+  spendingEur: number; // money out = the sum of the baskets
+  count: number;
+  baskets: SpendingBasket[];
+  /** The same days of the month before (or the whole month before, once this one is over). */
+  previous: { range: DateRange; spendingEur: number; changePct: number | null } | null;
+};
+
 // ─── Chat ────────────────────────────────────────────────────────────────
 
 export type ChatRole = "user" | "assistant";
@@ -317,11 +350,20 @@ export type DaySpending = {
 // spending alerts, recurring payments, unusual activity. Built by
 // lib/insights/proactive.ts; shown on the Account tab and given to the AI.
 
-export type InsightKind = "save_help" | "spending_alert" | "recurring" | "unusual";
+/**
+ * The category shown on the card. save_help = a savings opportunity; positive = a good habit;
+ * risk = something coming up (e.g. bills before payday bigger than the balance).
+ * positive + risk added 15 Nov.
+ */
+export type InsightKind = "save_help" | "spending_alert" | "recurring" | "unusual" | "positive" | "risk";
+
+/** How much it matters: risk = act now, watch = worth a look, info = good to know, good = well done. Added 15 Nov. */
+export type InsightSeverity = "risk" | "watch" | "info" | "good";
 
 export type Insight = {
   id: string; // stable per rule, e.g. "spending-alert"
   kind: InsightKind;
+  severity: InsightSeverity;
   title: string; // "Your grocery spending increased"
   /**
    * One short line to catch the eye before any detail, e.g. "You could save {+618 €} a year".
@@ -334,6 +376,8 @@ export type Insight = {
   why: string;
   /** What the customer could do about it. */
   action: string;
+  /** The action in a few words for the card, e.g. "Set a weekly grocery budget". Added 15 Nov. */
+  cta: string;
   /** Optional list, e.g. recurring payments per month. */
   table?: ChartRow[];
   /** Optional total under the list, e.g. "Potential annual cost". */
@@ -410,19 +454,42 @@ export type WeekSummary = {
 
 /**
  * Safe to spend (lib/insights/safeToSpend.ts — the same function as the coach's
- * safe_to_spend tool, so Home and the chat always agree). Added 14 Nov.
+ * safe_to_spend tool, so Home and the chat always agree). Every line adds up to the cent:
+ *   balanceEur − fixedCostsBeforePaydayEur − surpriseBufferEur = leftAfterCostsEur
+ *   safeUntilPaydayEur = leftAfterCostsEur if ≥ 0, else 0 (and shortfallEur = what's missing)
+ *   safePerDayEur × coveredDays = safeForRequestedDaysEur
+ * Added 14 Nov; breakdown fields 15 Nov.
  */
 export type SafeToSpendSummary = {
   today: string;
-  nextPayday: string | null; // null = no salary rhythm found (then 30 days are used)
+  /** null = no salary rhythm found; then daysToPayday is an assumed 30 (the UI says so). */
+  nextPayday: string | null;
   daysToPayday: number;
   balanceEur: number;
-  fixedCostsBeforePaydayEur: number; // bills + savings expected before payday (estimate)
-  surpriseBufferEur: number; // average irregular costs for those days
+  /** The bills / subscriptions / savings counted below (due up to and including payday). */
+  fixedCosts: UpcomingPayment[];
+  fixedCostsBeforePaydayEur: number;
+  /** Average irregular ("surprise") costs per month — the reserve's basis. */
+  surpriseAvgPerMonthEur: number;
+  surpriseBufferEur: number; // that average for the days until payday
+  leftAfterCostsEur: number; // balance − fixed − reserve; negative = not enough
   safeUntilPaydayEur: number;
+  shortfallEur: number; // > 0 only when fixed costs + reserve are more than the balance
   safePerDayEur: number;
   requestedDays: number;
+  /** Days of the requested period before payday (≤ requestedDays): only these get money. */
+  coveredDays: number;
   safeForRequestedDaysEur: number;
+  /** One entry per requested day, today first. */
+  plan: SafeDay[];
+};
+
+/** One day of the safe-to-spend plan. allowanceEur null = on / after payday (new budget). */
+export type SafeDay = {
+  date: string;
+  allowanceEur: number | null;
+  isPayday: boolean;
+  payments: UpcomingPayment[]; // fixed costs expected that day
 };
 
 /** A bill, subscription or automatic saving expected soon (from recurring payments). Added 14 Nov. */
@@ -435,8 +502,8 @@ export type UpcomingPayment = {
   amountEur: number; // its usual amount (positive)
 };
 
-/** GET /api/home — the Home tab parts no other endpoint has. Added 14 Nov. */
-export type HomeExtrasResponse = { safeToSpend: SafeToSpendSummary; upcoming: UpcomingPayment[] };
+/** GET /api/home — the Home tab parts no other endpoint has. safeToSpend null = no transactions. Added 14 Nov. */
+export type HomeExtrasResponse = { safeToSpend: SafeToSpendSummary | null; upcoming: UpcomingPayment[] };
 
 // ─── What-if / forecast ──────────────────────────────────────────────────
 
@@ -558,7 +625,7 @@ export type WhatIf = {
 };
 
 // ─── Saving goal + weekly missions ───────────────────────────────────────
-// Added (new types only, DECISIONS.md #53). Built by lib/goals/; GET/POST /api/goal.
+// Added (new types only, DECISIONS.md #60). Built by lib/goals/; GET/POST /api/goal.
 // The goal only moves when the user moves money to it; missions are built by code
 // from the user's own habits (never by the AI).
 

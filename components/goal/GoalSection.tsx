@@ -3,7 +3,7 @@
  * Saving goal + this week's mission, at the top of the This week page (/week, opened from Home). Owner: UI person.
  * Data: GET/POST /api/goal (lib/goals/). Every number comes from the server's GoalView.
  *
- * THE LOOP (DECISIONS.md #53):
+ * THE LOOP (DECISIONS.md #60):
  *   set a goal → pick 1 of up to 3 missions (built from your own habits) → the week runs
  *   → won or not, what you spent less than usual can be PUT TOWARD THE GOAL → next week.
  * PSYCHOLOGY, on purpose:
@@ -13,7 +13,7 @@
  * - no red, no lost XP, no streak to break; a missed week makes the next one lighter
  *
  * The dark demo strip (only with the DEMO bar on) adds purchases and moves days, because
- * the data is a fixed snapshot (mission weeks are the days after it ends, #53b).
+ * the data is a fixed snapshot (mission weeks are the days after it ends, #60b).
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";

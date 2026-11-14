@@ -1,37 +1,95 @@
 "use client";
 /**
- * "For you" on the Account tab: what the coach noticed without being asked
- * (GET /api/insights → lib/insights/proactive.ts). Owner: UI person.
+ * Coach insights on Home: what the coach noticed without being asked. Owner: UI person.
+ * Data: GET /api/insights → lib/insights/proactive.ts. The screen never makes up an
+ * observation: every card, number and suggestion comes from that endpoint.
  *
- * WHY a hook first, details on tap: the page should be readable in one glance.
- * Each tile shows ONE short line ("You could save 618 € a year"); tapping it opens a
- * sheet with the explanation, what to do, and (folded away) why it was noticed.
- * WHY calm colours: only the "you could save" number is green; the rest is plain text,
- * so nothing shouts. Colour returns inside the sheet, where there's room to explain.
+ * A card (compact, swipe for more): category + severity on top, one line with the number
+ * ("Restaurants up 274 % this month"), and the suggested action in a few words.
+ * Tap → a sheet with the explanation, the numbers, "Try this", why it was noticed, and
+ * "Ask the coach about this" (the chat starts with this insight as context).
+ * × hides a card on this device; "Show hidden" brings them back. "Coming up" risks can't be hidden.
+ * WHY calm colours: only severity gets colour (a small label + icon), so nothing shouts.
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Insight, InsightKind, InsightsResponse } from "@/lib/types";
+import type { Insight, InsightKind, InsightSeverity, InsightsResponse } from "@/lib/types";
 import { MoneyText } from "@/components/chat/MoneyText";
 import { formatValue } from "@/components/charts/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 
-const KIND: Record<InsightKind, { label: string; icon: IconName; tap: string }> = {
-  save_help: { label: "Help to save", icon: "piggy", tap: "Tap to see how" },
-  spending_alert: { label: "Spending alert", icon: "trend", tap: "Tap to see why" },
-  unusual: { label: "Unusual activity", icon: "shield", tap: "Tap to see why" },
-  recurring: { label: "Recurring payments", icon: "calendar", tap: "Tap to see them" },
+const KIND: Record<InsightKind, { label: string; icon: IconName }> = {
+  risk: { label: "Coming up", icon: "alert" },
+  save_help: { label: "Savings", icon: "piggy" },
+  spending_alert: { label: "Spending change", icon: "trend" },
+  unusual: { label: "Unusual activity", icon: "shield" },
+  recurring: { label: "Recurring", icon: "calendar" },
+  positive: { label: "Good habit", icon: "sparkles" },
 };
+
+const SEVERITY: Record<InsightSeverity, { label: string; color: string }> = {
+  risk: { label: "Needs attention", color: "var(--money-out)" },
+  watch: { label: "Worth a look", color: "var(--warning)" },
+  info: { label: "Good to know", color: "var(--muted)" },
+  good: { label: "Nice work", color: "var(--accent)" },
+};
+
+/** WHY "coming up" risks can't be hidden: bills you can't cover shouldn't disappear with one tap. */
+const canDismiss = (i: Insight) => i.kind !== "risk";
+
+// ─── Hidden cards (this device only) ─────────────────────────────────────
+// WHY localStorage: hiding a card is a personal convenience, not data the bank keeps.
+// WHY id + hook as the key: the card comes back by itself when its numbers change.
+const STORE = "money-coach:hidden-insights";
+const keyOf = (i: Insight) => `${i.id}|${i.hook}`;
+function loadHidden(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(STORE) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+function saveHidden(keys: string[]) {
+  try {
+    localStorage.setItem(STORE, JSON.stringify(keys.slice(-50)));
+  } catch {
+    // private mode etc.: hiding then lasts only until the page reloads
+  }
+}
 
 const toneClass = (tone?: string) =>
   tone === "in" ? "text-money-in" : tone === "out" ? "text-money-out" : "";
 
-/** The full insight, in a sheet that slides up from the bottom. */
-function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => void }) {
+/** The chat link: the question, plus the insight itself so the coach continues from it. */
+function askHref(i: Insight): string {
+  return `/chat?ask=${encodeURIComponent(i.ask)}&ctx=${encodeURIComponent(`${i.title}. ${i.detail}`)}`;
+}
+
+/**
+ * The category, in the severity's colour (dot + text). WHY not "category · severity" here:
+ * both didn't fit on a phone card; the sheet spells out the severity, and so does the
+ * screen-reader text.
+ */
+function Label({ i }: { i: Insight }) {
   return (
-    <BottomSheet label={KIND[insight.kind].label} title={insight.title} onClose={onClose}>
+    <span
+      className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide"
+      style={{ color: SEVERITY[i.severity].color }}
+      title={SEVERITY[i.severity].label}
+    >
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: SEVERITY[i.severity].color }} />
+      <span className="truncate">{KIND[i.kind].label}</span>
+      <span className="sr-only">, {SEVERITY[i.severity].label}</span>
+    </span>
+  );
+}
+
+/** The full insight, in a sheet that slides up from the bottom. */
+function InsightSheet({ insight, onClose, onHide }: { insight: Insight; onClose: () => void; onHide: () => void }) {
+  return (
+    <BottomSheet label={`${KIND[insight.kind].label} · ${SEVERITY[insight.severity].label}`} title={insight.title} onClose={onClose}>
       <p className="mt-2 text-[15px] leading-snug">
         <MoneyText text={insight.detail} />
       </p>
@@ -75,13 +133,13 @@ function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => v
       </details>
 
       <Link
-        href={`/chat?ask=${encodeURIComponent(insight.ask)}`}
+        href={askHref(insight)}
         className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-3 text-sm font-semibold text-accent-foreground"
       >
         <Icon name="chat" size={18} /> Ask the coach about this
       </Link>
       {/* WHY only for "help to save": a goal turns "you keep little" into something to do
-          this week (DECISIONS.md #53c). */}
+          this week (DECISIONS.md #60c). */}
       {insight.kind === "save_help" && (
         <Link
           href="/week?setup=1"
@@ -90,13 +148,42 @@ function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => v
           🎯 Set a savings goal
         </Link>
       )}
+      {canDismiss(insight) && (
+        <button type="button" onClick={onHide} className="mt-2 w-full py-2 text-sm text-muted">
+          Hide this insight
+        </button>
+      )}
     </BottomSheet>
+  );
+}
+
+function AllClear({ hiddenCount, onShow }: { hiddenCount: number; onShow: () => void }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <Icon name="leaf" size={19} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{hiddenCount ? "You've hidden all insights" : "All clear for now"}</p>
+        <p className="text-xs text-muted">
+          {hiddenCount
+            ? "The coach still keeps an eye on things and adds new ones here."
+            : "Nothing needs your attention. The coach keeps watching and will flag anything new here."}
+        </p>
+        {hiddenCount > 0 && (
+          <button type="button" onClick={onShow} className="mt-1 text-xs font-semibold text-accent">
+            Show them again
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
 export function InsightCards({ title = "For you" }: { title?: string }) {
   const [insights, setInsights] = useState<Insight[] | null>(null);
   const [open, setOpen] = useState<Insight | null>(null);
+  const [hidden, setHidden] = useState<string[]>(() => (typeof window === "undefined" ? [] : loadHidden()));
 
   useEffect(() => {
     fetch("/api/insights")
@@ -105,24 +192,38 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
         if (!res.ok) throw new Error(json.detail || json.error);
         setInsights((json as InsightsResponse).insights);
       })
-      // WHY quiet: insights are extra; the rest of the Account tab still works.
+      // WHY quiet: insights are extra; the rest of Home still works.
       .catch((err) => {
         console.error("[insights]", err);
         setInsights([]);
       });
   }, []);
 
+  function hide(i: Insight) {
+    const next = [...hidden.filter((k) => k !== keyOf(i)), keyOf(i)];
+    setHidden(next);
+    saveHidden(next);
+    setOpen(null);
+  }
+  function showHidden() {
+    const mine = new Set((insights ?? []).map(keyOf));
+    const next = hidden.filter((k) => !mine.has(k));
+    setHidden(next);
+    saveHidden(next);
+  }
+
   if (!insights) {
     return (
       <SkeletonGroup>
-        <Skeleton className="mb-2 ml-1 h-4 w-16" />
+        <Skeleton className="mb-2 ml-1 h-4 w-28" />
         <div className="-mx-4 flex gap-2.5 overflow-hidden px-4 pb-1">
           {[0, 1].map((i) => (
-            <div key={i} className="flex w-[78%] shrink-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3.5">
+            <div key={i} className="flex w-[80%] shrink-0 items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
               <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-              <div className="flex-1 space-y-1.5">
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-2.5 w-1/2" />
                 <Skeleton className="h-3.5 w-4/5" />
-                <Skeleton className="h-2.5 w-1/3" />
+                <Skeleton className="h-2.5 w-2/5" />
               </div>
             </div>
           ))}
@@ -130,36 +231,66 @@ export function InsightCards({ title = "For you" }: { title?: string }) {
       </SkeletonGroup>
     );
   }
-  if (insights.length === 0) return null;
+
+  const visible = insights.filter((i) => !hidden.includes(keyOf(i)));
+  const hiddenCount = insights.length - visible.length;
+
   return (
     <section>
-      <h2 className="mb-2 px-1 text-sm font-semibold">{title}</h2>
-      {/* WHY scroll-px-4: tiles snap in line with the page edge; scrollbar hidden (swipe is enough). */}
-      <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {insights.map((i) => {
-          const kind = KIND[i.kind];
-          return (
-            <button
-              key={i.id}
-              type="button"
-              onClick={() => setOpen(i)}
-              className="flex w-[78%] shrink-0 snap-start items-center gap-3 rounded-2xl border border-line bg-surface p-3.5 text-left"
-            >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background text-accent">
-                <Icon name={kind.icon} size={19} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] leading-snug">
-                  <MoneyText text={i.hook} colors={i.kind === "save_help"} />
-                </span>
-                <span className="mt-0.5 block text-xs text-muted">{kind.tap}</span>
-              </span>
-              <Icon name="chevron" size={16} className="shrink-0 text-muted" />
-            </button>
-          );
-        })}
+      <div className="mb-2 flex items-baseline justify-between px-1">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {hiddenCount > 0 && visible.length > 0 && (
+          <button type="button" onClick={showHidden} className="text-xs font-medium text-accent">
+            Show hidden ({hiddenCount})
+          </button>
+        )}
       </div>
-      {open && <InsightSheet insight={open} onClose={() => setOpen(null)} />}
+
+      {visible.length === 0 ? (
+        <AllClear hiddenCount={hiddenCount} onShow={showHidden} />
+      ) : (
+        // WHY scroll-px-4: tiles snap in line with the page edge; scrollbar hidden (swipe is enough).
+        <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {visible.map((i) => (
+            <div key={i.id} className="relative w-[80%] shrink-0 snap-start rounded-2xl border border-line bg-surface">
+              <button type="button" onClick={() => setOpen(i)} className="flex w-full items-start gap-3 p-3.5 text-left">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    color: SEVERITY[i.severity].color,
+                    background: `color-mix(in srgb, ${SEVERITY[i.severity].color} 12%, var(--surface))`,
+                  }}
+                >
+                  <Icon name={KIND[i.kind].icon} size={19} />
+                </span>
+                <span className="min-w-0 flex-1 pr-5">
+                  <Label i={i} />
+                  <span className="mt-0.5 block text-[15px] font-medium leading-snug">
+                    {/* Green / red only where the number is the point: savings, risks. */}
+                    <MoneyText text={i.hook} colors={i.kind === "save_help" || i.kind === "risk"} />
+                  </span>
+                  <span className="mt-1 flex items-center gap-0.5 text-xs font-medium text-accent">
+                    {i.cta}
+                    <Icon name="chevron" size={13} />
+                  </span>
+                </span>
+              </button>
+              {canDismiss(i) && (
+                <button
+                  type="button"
+                  onClick={() => hide(i)}
+                  aria-label={`Hide: ${i.title}`}
+                  className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+                >
+                  <Icon name="close" size={15} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && <InsightSheet insight={open} onClose={() => setOpen(null)} onHide={() => hide(open)} />}
     </section>
   );
 }

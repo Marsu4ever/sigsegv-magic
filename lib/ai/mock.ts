@@ -271,10 +271,12 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     );
   }
 
-  if (has(q, "safe to spend", "safe")) {
+  if (has(q, "safe to spend", "safe", "payday")) {
     const s = data("safe_to_spend", { days: 7 });
+    if (s.note) return reply(s.note);
     return reply(
-      `About ${plus(s.safeForRequestedDaysEur)} is safe to spend in the next 7 days. Next payday ≈ ${s.nextPayday}.`,
+      `About ${plus(s.safeForRequestedDaysEur)} is safe to spend in the next ${s.coveredDays} days.` +
+        (s.nextPayday ? ` Next payday ≈ ${s.nextPayday}.` : " No regular payday found."),
       chart("table", "Safe to spend", "safe_to_spend", { days: 7 }),
     );
   }

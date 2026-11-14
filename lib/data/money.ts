@@ -4,12 +4,13 @@
  * Same rules as lib/data/index.ts: plain data out, all math here.
  */
 import type { Basket, ChartRow, DateRange, Transaction } from "@/lib/types";
-import { addDays } from "./dates";
+import { addDays, startOfMonth, startOfWeek } from "./dates";
 import {
   categoryKind,
   getTransactions,
   isIncome,
   isSpending,
+  matchLabel,
   round2,
   spendByCategory,
   spentEur,
@@ -143,5 +144,127 @@ export function balanceOverTime(range: DateRange): BalanceSeries {
     rows,
     lowest: lo ? { date: lo.label, balanceEur: lo.value } : null,
     highest: hi ? { date: hi.label, balanceEur: hi.value } : null,
+  };
+}
+
+// ─── money_over_time ─────────────────────────────────────────────────────
+
+export const MONEY_MEASURES = [
+  "income",
+  "spending",
+  "kept",
+  "income_vs_spending",
+  "balance",
+] as const;
+export type MoneyMeasure = (typeof MONEY_MEASURES)[number];
+
+export type MoneyOverTime = {
+  range: DateRange;
+  measure: MoneyMeasure;
+  groupBy: "day" | "week" | "month";
+  /** One row per day/week/month. label = first day of the bucket ("2026-03-01"). */
+  rows: ChartRow[];
+  seriesNames?: [string, string];
+  /** Sums and extremes, so the AI never adds up numbers itself. */
+  summary: Record<string, unknown>;
+};
+
+/**
+ * Income, spending, kept (income − spending) or balance per day / week / month.
+ * The general "ask anything over time" building block: any range, any grouping,
+ * optional category / basket filter (spending only).
+ * WHY one function: lets the AI answer "income last 7 months", "kept per month
+ * this year", "restaurants per week" with one tool instead of many narrow ones.
+ */
+export function moneyOverTime(
+  range: DateRange,
+  measure: MoneyMeasure,
+  groupBy: "day" | "week" | "month",
+  filter: { category?: string; basket?: Basket } = {},
+): MoneyOverTime {
+  const bucketOf = (d: string) =>
+    groupBy === "day" ? d : groupBy === "week" ? startOfWeek(d) : startOfMonth(d);
+  const buckets: string[] = [];
+  for (let d = range.from; d <= range.to; d = addDays(d, 1)) {
+    const b = bucketOf(d);
+    if (buckets[buckets.length - 1] !== b) buckets.push(b);
+  }
+
+  if (measure === "balance") {
+    // End-of-bucket balance (the last day of each bucket).
+    const daily = balanceOverTime(range).rows;
+    const last = new Map<string, number>();
+    for (const r of daily) last.set(bucketOf(r.label), r.value);
+    const rows = buckets.filter((b) => last.has(b)).map((b) => ({ label: b, value: last.get(b)! }));
+    return { range, measure, groupBy, rows, summary: summarize(rows, "balanceEur", false) };
+  }
+
+  const income = new Map<string, number>(buckets.map((b) => [b, 0]));
+  const spending = new Map<string, number>(buckets.map((b) => [b, 0]));
+  const needle = filter.category?.trim().toLowerCase();
+  for (const t of getTransactions(range)) {
+    const b = bucketOf(t.date);
+    if (isIncome(t)) {
+      income.set(b, (income.get(b) ?? 0) + t.amountEur);
+    } else if (isSpending(t)) {
+      if (needle && !matchLabel(t, needle)) continue;
+      if (filter.basket && t.basket !== filter.basket) continue;
+      spending.set(b, (spending.get(b) ?? 0) + spentEur(t));
+    }
+  }
+  const inc = (b: string) => round2(income.get(b) ?? 0);
+  const out = (b: string) => round2(spending.get(b) ?? 0);
+
+  if (measure === "income_vs_spending") {
+    const rows: ChartRow[] = buckets.map((b) => ({
+      label: b,
+      value: inc(b),
+      value2: out(b),
+      tone: "in",
+      tone2: "out",
+    }));
+    const totalIn = round2(rows.reduce((s, r) => s + r.value, 0));
+    const totalOut = round2(rows.reduce((s, r) => s + (r.value2 ?? 0), 0));
+    return {
+      range,
+      measure,
+      groupBy,
+      rows,
+      seriesNames: ["Income", "Spending"],
+      summary: {
+        periods: rows.length,
+        totalIncomeEur: totalIn,
+        totalSpendingEur: totalOut,
+        totalKeptEur: round2(totalIn - totalOut),
+        averageIncomeEur: rows.length ? round2(totalIn / rows.length) : 0,
+        averageSpendingEur: rows.length ? round2(totalOut / rows.length) : 0,
+        periodsSpentMoreThanEarned: rows.filter((r) => (r.value2 ?? 0) > r.value).map((r) => r.label),
+      },
+    };
+  }
+
+  const rows: ChartRow[] = buckets.map((b) => {
+    const value = measure === "income" ? inc(b) : measure === "spending" ? out(b) : round2(inc(b) - out(b));
+    const tone = measure === "spending" || value < 0 ? "out" : "in";
+    return { label: b, value, tone };
+  });
+  const key = measure === "income" ? "incomeEur" : measure === "spending" ? "spendingEur" : "keptEur";
+  return { range, measure, groupBy, rows, summary: summarize(rows, key, true) };
+}
+
+/** Total, average, highest and lowest of a series — so the AI doesn't do the math. */
+export function summarize(rows: ChartRow[], key: string, withTotal: boolean): Record<string, unknown> {
+  if (rows.length === 0) return { periods: 0 };
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  const hi = rows.reduce((a, r) => (r.value > a.value ? r : a));
+  const lo = rows.reduce((a, r) => (r.value < a.value ? r : a));
+  return {
+    periods: rows.length,
+    ...(withTotal ? { [`total_${key}`]: round2(total) } : {}),
+    [`average_${key}`]: round2(total / rows.length),
+    highest: { period: hi.label, [key]: hi.value },
+    lowest: { period: lo.label, [key]: lo.value },
+    first: { period: rows[0].label, [key]: rows[0].value },
+    last: { period: rows[rows.length - 1].label, [key]: rows[rows.length - 1].value },
   };
 }

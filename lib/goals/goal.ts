@@ -3,7 +3,7 @@
  * SERVER ONLY. Owner: INSIGHTS person. All numbers about a goal come from here (team rule).
  *
  * TIME: the data is a fixed snapshot ending on getDataToday() (DECISIONS.md #10). Mission
- * week N is the 7 days after the data ends, + 7 days per later week (DECISIONS.md #53b). The
+ * week N is the 7 days after the data ends, + 7 days per later week (DECISIONS.md #60b). The
  * app's "today" for goals = the current day of the current mission week (simToday).
  */
 import type { DateRange, GoalDraft, SavingsGoal } from "@/lib/types";
@@ -141,7 +141,7 @@ export function goalProgress(state: GoalState) {
   const elapsedWeeks = Math.max(0, Math.floor(daysBetween(g.createdOn, today) / 7));
   const planned = g.startEur + g.weeklyPlanEur * elapsedWeeks;
   // WHY never negative: "behind plan" is guilt, not help. weeklyNeededEur already says
-  // what it takes from here (DECISIONS.md #53: no loss framing).
+  // what it takes from here (DECISIONS.md #60: no loss framing).
   const daysAhead =
     g.weeklyPlanEur > 0 ? Math.max(0, Math.floor(((savedEur - planned) / g.weeklyPlanEur) * 7)) : 0;
   return {

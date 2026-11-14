@@ -4,7 +4,7 @@
  *
  * WHY a reducer: every change goes through one checked place, and it's easy to read what
  * each button does. The demo actions (addPurchase / nextDay / endWeek) stand in for real
- * card payments and real days passing — the data is a fixed snapshot (DECISIONS.md #53b).
+ * card payments and real days passing — the data is a fixed snapshot (DECISIONS.md #60b).
  */
 import type { GoalDraft } from "@/lib/types";
 import { round2 } from "@/lib/data";
@@ -104,7 +104,7 @@ export function applyGoalAction(state: GoalState, a: GoalAction): ActionResult {
     }
 
     case "reset": {
-      // WHY keep weeks won, difficulty and joy: XP never goes down (DECISIONS.md #53).
+      // WHY keep weeks won, difficulty and joy: XP never goes down (DECISIONS.md #60).
       const fresh = emptyGoalState();
       return ok({ ...fresh, history: state.history, cutPct: state.cutPct, joy: state.joy, week: state.week, result: state.result });
     }
