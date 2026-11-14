@@ -137,14 +137,6 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
         {compact && <MarbleJar drops={v.drops} green={green} gold={gold} width={84} />}
       </div>
 
-      {/* Chat card only (removed from full screen — less text there). */}
-      {compact && v.leakiestDays && (
-        <p className="leak-fade-up text-sm" style={{ animationDelay: "250ms" }}>
-          <span className="font-semibold">{shortDays(v.leakiestDays.days)}</span> are your leakiest
-          days — {Math.round(v.leakiestDays.share * 100)}% of your everyday spending.
-        </p>
-      )}
-
       {!compact && (
         <div ref={bigJar} className="flex flex-col items-center">
           {/* The period, said once, as a small pill above the jar. */}
@@ -190,13 +182,6 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
               <CountUp value={greenEur} format={eur} duration={500} />
             </span>
           </div>
-          {green.size === 0 && gold.size === 0 && (
-            <p className="-mt-9 h-9 pt-1 text-center text-xs text-muted">
-              Tap “sparks joy” or “skip” below
-              <br />
-              and watch the jar
-            </p>
-          )}
         </div>
       )}
 
@@ -224,7 +209,16 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
             </div>
           </div>
         )}
-        {!compact && <h3 className="text-sm font-semibold">Your habits, per year</h3>}
+        {/* Chat card shows only the 3 biggest — say so; full screen shows all. */}
+        {compact ? (
+          // Chat card: "Top 3" in bold yellow (no pill — team call).
+          // WHY #ca8a04: a deep yellow that stays readable on white.
+          <h3 className="text-base font-bold" style={{ color: "#ca8a04" }}>
+            Top 3
+          </h3>
+        ) : (
+          <h3 className="text-sm font-semibold">Your habits, per year</h3>
+        )}
         {(compact ? v.habits.slice(0, 3) : v.habits).map((h, i) => (
           <HabitCard
             key={h.name}
@@ -274,6 +268,13 @@ function Headline({ v, saved, compact }: { v: LeaksView; saved: number; compact:
           <span className="font-semibold text-foreground">
             <CountUp value={v.smallPerYearEur} format={eur0} delay={300} />
           </span>
+        </div>
+      )}
+      {/* Full screen only, under "small stuff" (team call). */}
+      {!compact && v.leakiestDays && (
+        <div className="mt-0.5 text-xs text-muted">
+          <span className="font-semibold text-foreground">{shortDays(v.leakiestDays.days)}</span>{" "}
+          are your leakiest days ({Math.round(v.leakiestDays.share * 100)}%)
         </div>
       )}
     </div>
