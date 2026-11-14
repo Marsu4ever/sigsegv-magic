@@ -12,6 +12,7 @@ import { TabBar } from "@/components/TabBar";
 import { DevButton } from "@/components/DevButton";
 import { CustomerSwitcher } from "@/components/CustomerSwitcher";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { RouteFade } from "@/components/RouteFade";
 
 export const metadata: Metadata = {
   title: "Money Coach",
@@ -43,7 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
           {/* Demo-only: whose data is shown + switch customer. */}
           <CustomerSwitcher />
-          <main className="min-h-0 flex-1">{children}</main>
+          <main className="min-h-0 flex-1">
+            <RouteFade>{children}</RouteFade>
+          </main>
           <TabBar />
         </div>
         {/* Team-only shortcut, outside the app column. */}

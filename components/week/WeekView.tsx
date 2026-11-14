@@ -29,6 +29,7 @@ import { BASKETS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
 import { DevHeaderButton } from "@/components/DevButton";
+import { CountUp } from "@/components/ui/CountUp";
 
 const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
@@ -123,7 +124,7 @@ function Hero({
       <div className="text-center">
         <p className="text-xs text-muted">Spent</p>
         <p className="text-4xl font-bold tracking-tight text-accent tabular-nums">
-          {formatValue(data.totalSpentEur, "€")}
+          <CountUp value={data.totalSpentEur} format={(n) => formatValue(n, "€")} duration={800} fixedWidth />
         </p>
       </div>
 

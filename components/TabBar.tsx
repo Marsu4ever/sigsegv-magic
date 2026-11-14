@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { requestChatReset } from "@/lib/chatReset";
+import { tapHaptic } from "@/lib/haptic";
 
 // WHY outline icons, not emoji: emoji looked homemade; these match the app.
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -30,12 +31,20 @@ export function TabBar() {
             key={tab.href}
             href={tab.href}
             // Tapping Chat always starts fresh: back to the suggested questions.
-            onClick={tab.href === "/chat" ? requestChatReset : undefined}
-            className={`flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] ${
-              active ? "font-semibold text-accent" : "text-muted"
+            onClick={() => {
+              tapHaptic();
+              if (tab.href === "/chat") requestChatReset();
+            }}
+            className={`group flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] transition-colors ${
+              active ? "font-semibold text-accent" : "text-muted hover:text-foreground"
             }`}
           >
-            <Icon name={tab.icon} size={22} strokeWidth={active ? 2.2 : 1.8} />
+            {/* Icon presses in on tap and lifts a little when its tab becomes active. */}
+            <span
+              className={`transition-transform duration-200 group-active:scale-90 ${active ? "-translate-y-0.5" : ""}`}
+            >
+              <Icon name={tab.icon} size={22} strokeWidth={active ? 2.2 : 1.8} />
+            </span>
             {tab.label}
           </Link>
         );

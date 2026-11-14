@@ -23,8 +23,9 @@ export const BASKETS: Basket[] = ["mandatory_regular", "mandatory_irregular", "e
 
 /** Human-readable basket names for the UI. */
 export const BASKET_LABELS: Record<Basket, string> = {
-  mandatory_regular: "Mandatory & regular",
-  mandatory_irregular: "Mandatory & irregular",
+  // WHY short (team call, 14 Nov): same words as the Week tab; "Mandatory &" was long and stiff.
+  mandatory_regular: "Regular",
+  mandatory_irregular: "Surprising expenses",
   everyday: "Everyday spending",
 };
 

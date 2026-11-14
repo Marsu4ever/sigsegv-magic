@@ -19,12 +19,18 @@ export function CountUp({
   duration = 900,
   delay = 0,
   whenVisible = false,
+  fixedWidth = false,
 }: {
   value: number;
   format: (n: number) => string;
   duration?: number;
   delay?: number;
   whenVisible?: boolean;
+  /**
+   * true = takes the final number's width from the start, so text around it doesn't jump
+   * while it counts (e.g. inside a sentence: "save 15,96 € a month" kept re-wrapping).
+   */
+  fixedWidth?: boolean;
 }) {
   const [shown, setShown] = useState(0);
   const [visible, setVisible] = useState(!whenVisible);
@@ -72,5 +78,14 @@ export function CountUp({
     };
   }, [value, duration, delay, visible]);
 
-  return <span ref={el}>{format(shown)}</span>;
+  if (!fixedWidth) return <span ref={el}>{format(shown)}</span>;
+  // Both in the same grid cell: the invisible final value sets the width.
+  return (
+    <span ref={el} className="inline-grid tabular-nums">
+      <span className="invisible col-start-1 row-start-1" aria-hidden>
+        {format(value)}
+      </span>
+      <span className="col-start-1 row-start-1 text-right">{format(shown)}</span>
+    </span>
+  );
 }
