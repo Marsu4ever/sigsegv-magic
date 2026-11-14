@@ -131,6 +131,12 @@ const ICONS = {
       <path d="M8 14h.01" />
     </>
   ),
+  search: (
+    <>
+      <path d="m21 21-4.34-4.34" />
+      <circle cx="11" cy="11" r="8" />
+    </>
+  ),
   "arrow-up": (
     <>
       <path d="M7 7h10v10" />

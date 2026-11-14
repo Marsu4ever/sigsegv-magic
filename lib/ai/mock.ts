@@ -120,7 +120,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     const year = help?.total ? ` That adds up to {+${eur0(help.total.value)}} a year.` : "";
     if (help) return replyText(`${help.action}${year}`);
   }
-  if (has(q, "should i know", "anything new", "alerts", "how am i doing overall")) {
+  if (has(q, "should i know", "should know", "anything new", "alerts", "how am i doing overall")) {
     const all = data("proactive_insights").insights as { title: string }[];
     return replyText(all.length ? `Here's what I noticed: ${all.map((i) => i.title).join("; ")}.` : "Nothing unusual right now.");
   }

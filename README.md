@@ -62,7 +62,8 @@ Chat tab  ── POST /api/chat ──────────► lib/ai/chat.ts
                                          lib/ai/tools.ts ──► lib/data (real numbers)
                                               │
           ◄── { text, charts[], whatIf? } ────┘
-Home      ── GET /api/account ────────► lib/data/home.ts → getAccountSummary()   (no AI, start page; also Activity)
+Home      ── GET /api/account ────────► lib/data/home.ts → getAccountSummary()   (no AI, start page)
+Activity  ── GET /api/transactions ───► lib/data/home.ts → searchTransactions()   (search, filters; Home's recent list)
           ── GET /api/home ───────────► lib/insights → safeToSpend() + upcomingPayments()   (no AI)
 Insights  ── GET /api/insights ───────► lib/insights/proactive.ts → proactiveInsights()   (no AI; also an AI tool)
 Week      ── GET /api/week ───────────► lib/data → getWeekSummary()   (no AI; Home + /week)

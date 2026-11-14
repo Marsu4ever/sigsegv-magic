@@ -66,10 +66,15 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 }
 
 /** One payment opened: the prediction, why it's counted, and its real past payments. */
-function PaymentSheet({ p, onClose }: { p: UpcomingPayment; onClose: () => void }) {
+function PaymentSheet({ p, onClose, nested }: { p: UpcomingPayment; onClose: () => void; nested?: boolean }) {
   const predicted = p.status === "predicted";
   return (
-    <BottomSheet label={`${predicted ? "Predicted" : "Scheduled"} · ${KIND_LABEL[p.kind]}`} title={p.name} onClose={onClose}>
+    <BottomSheet
+      label={`${predicted ? "Predicted" : "Scheduled"} · ${KIND_LABEL[p.kind]}`}
+      title={p.name}
+      onClose={onClose}
+      onBack={nested ? onClose : undefined}
+    >
       <dl className="mt-3 rounded-xl bg-surface px-4 shadow-sm">
         <Fact label="Expected">
           {predicted ? "around " : ""}
@@ -111,7 +116,7 @@ function PaymentSheet({ p, onClose }: { p: UpcomingPayment; onClose: () => void 
       </ul>
       {p.history[0] && (
         <Link
-          href={`/activity?month=${p.history[0].date.slice(0, 7)}`}
+          href={`/activity?${new URLSearchParams({ month: p.history[0].date.slice(0, 7), category: p.category })}`}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-line py-3 text-sm font-semibold"
         >
           <Icon name="activity" size={18} /> See the latest one in Activity
@@ -180,6 +185,7 @@ export function UpcomingPayments({
   max = SHOWN,
   empty = "No regular bills found in your past payments.",
   inspectable = true,
+  nested = false,
 }: {
   items: UpcomingPayment[];
   /** Splits the list into before / after payday (Home). */
@@ -193,6 +199,8 @@ export function UpcomingPayments({
   empty?: string;
   /** Tap a row → its history and why it's counted. */
   inspectable?: boolean;
+  /** Shown inside another sheet: an opened payment gets a back button to this list. */
+  nested?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [open, setOpen] = useState<UpcomingPayment | null>(null);
@@ -243,7 +251,7 @@ export function UpcomingPayments({
         </p>
       )}
 
-      {open && <PaymentSheet p={open} onClose={() => setOpen(null)} />}
+      {open && <PaymentSheet p={open} onClose={() => setOpen(null)} nested={nested} />}
     </div>
   );
 }

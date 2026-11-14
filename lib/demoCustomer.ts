@@ -13,5 +13,7 @@ export function switchDemoCustomer(id: string | null): void {
   const maxAge = id ? 60 * 60 * 24 * 30 : 0; // 30 days; 0 deletes the cookie
   document.cookie = `${DEMO_CUSTOMER_COOKIE}=${id ?? ""}; path=/; max-age=${maxAge}; samesite=lax`;
   // WHY reload: every tab and the chat start fresh with the new person's data.
-  window.location.reload();
+  // WHY without the query (?month, ?category…): those belonged to the previous person; the
+  // same tab opens on the new person's defaults instead of an empty filtered view.
+  window.location.replace(window.location.pathname);
 }

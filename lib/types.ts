@@ -402,6 +402,24 @@ export type AccountTransaction = {
   kind: "spending" | "income" | "savings_move";
 };
 
+/**
+ * GET /api/transactions — search the customer's transactions (Activity, and Home's recent list).
+ * Query: month (YYYY-MM | latest) or from / to (YYYY-MM-DD), q (merchant type or category),
+ * category (exact), type (all | income | expense), sort (newest | oldest), offset, limit. Added 15 Nov.
+ */
+export type TransactionSearch = {
+  range: DateRange; // the dates searched (defaults to all the data)
+  dataRange: DateRange | null; // first … last transaction (min / max for date pickers); null = no data
+  asOf: string;
+  /** Categories in the searched dates (before the category filter), for the filter list. */
+  categories: { name: string; count: number }[];
+  count: number; // all matching transactions (not just this page)
+  incomeEur: number; // money in among the matches
+  spendingEur: number; // money out among the matches (moves to own savings are neither)
+  transactions: AccountTransaction[]; // this page, in the requested order
+  nextOffset: number | null; // null = this was the last page
+};
+
 /** GET /api/account?month=YYYY-MM response body. */
 export type AccountSummary = {
   /** null when the customer has no transactions at all (never shown as a made-up value). Changed 15 Nov. */

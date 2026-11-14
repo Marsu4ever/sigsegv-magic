@@ -21,6 +21,7 @@ import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 import { DevHeaderButton } from "@/components/DevButton";
+import { BackButton } from "@/components/ui/BackButton";
 
 /**
  * WHY a client-side limit too: even if the server never answers (crash,
@@ -96,6 +97,8 @@ export function ChatView() {
   const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
   // The lightbulb next to the text box: suggested questions again, mid-conversation.
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  // Set when a question came from another screen (?ask=): the header then shows a back button.
+  const [fromLink, setFromLink] = useState(false);
   // WHY: someone who keeps little of their income may not know it. The coach says so
   // first, before they ask (lib/insights/proactive.ts, "save_help").
   const [opener, setOpener] = useState<ChatMessage | null>(null);
@@ -198,6 +201,7 @@ export function ChatView() {
   function resetChat() {
     inFlight.current?.abort();
     inFlight.current = null;
+    setFromLink(false);
     setMessages([]);
     setWhatIfReply(null);
     setLoading(false);
@@ -287,6 +291,7 @@ export function ChatView() {
     // is cancelled, so the question is asked exactly once.
     const id = setTimeout(() => {
       window.history.replaceState(null, "", "/chat"); // a reload shouldn't ask again
+      setFromLink(true);
       send(ask, ctx);
     }, 0);
     return () => clearTimeout(id);
@@ -297,6 +302,8 @@ export function ChatView() {
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
         <h1 className="flex items-center gap-2 font-semibold">
+          {/* Back to where the question came from (e.g. an insight on Home). */}
+          {fromLink && <BackButton fallback="/home" />}
           <LogoMark size={26} />
           Money Coach
         </h1>

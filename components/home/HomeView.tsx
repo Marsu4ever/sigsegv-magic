@@ -14,13 +14,15 @@
  *                                              last 7 days are on /week)
  *   5. upcoming payments     → /api/home      (predicted from past payments, next month;
  *                                              grouped before / after payday, tap for history)
- *   6. recent transactions   → /api/account   (latest few; everything on /activity)
+ *   6. recent transactions   → /api/transactions?limit=6 (latest, across months; all + search on /activity)
  * No numbers are made here: every amount comes from those endpoints (team rule).
  * WHY each section loads on its own (own skeleton): a slow part doesn't hold up the rest.
+ * WHY 3–6 fold (CollapsibleSection): Home was too busy. Overview and safe to spend always show;
+ * coach insights start open; breakdown, upcoming and recent start closed. Each choice is kept.
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AccountSummary, HomeExtrasResponse, WeekSummary } from "@/lib/types";
+import type { AccountSummary, HomeExtrasResponse, TransactionSearch, WeekSummary } from "@/lib/types";
 import { AccountOverview } from "./AccountOverview";
 import { TransactionDayList } from "@/components/account/TransactionList";
 import { InsightCards } from "@/components/insights/InsightCards";
@@ -29,10 +31,11 @@ import { SpendingBreakdown } from "./SpendingBreakdown";
 import { UpcomingPayments } from "./UpcomingPayments";
 import { DevHeaderButton } from "@/components/DevButton";
 import { Icon } from "@/components/ui/Icon";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
 import { Skeleton, SkeletonCard, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 
-/** How many of the latest transactions Home shows (the rest: Activity). */
-const RECENT = 5;
+/** How many of the latest transactions Home shows (the rest: Activity). WHY 6: the spec's 5–8, compact. */
+const RECENT = 6;
 
 /** GET a JSON endpoint once; `error` holds the server's message if it fails. */
 function useJson<T>(url: string): { data: T | null; error: string | null } {
@@ -52,29 +55,13 @@ function useJson<T>(url: string): { data: T | null; error: string | null } {
   return state;
 }
 
-/** A titled block of the dashboard, with an optional link on the right ("See all"). */
-function Section({
-  title,
-  link,
-  children,
-}: {
-  title: string;
-  link?: { href: string; label: string };
-  children: React.ReactNode;
-}) {
+/** The small link on the right of a section title ("See all ›"). */
+function SectionLink({ href, label }: { href: string; label: string }) {
   return (
-    <section>
-      <div className="mb-2 flex items-baseline justify-between px-1">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {link && (
-          <Link href={link.href} className="flex items-center text-xs font-medium text-accent">
-            {link.label}
-            <Icon name="chevron" size={14} />
-          </Link>
-        )}
-      </div>
-      {children}
-    </section>
+    <Link href={href} className="flex items-center text-xs font-medium text-accent">
+      {label}
+      <Icon name="chevron" size={14} />
+    </Link>
   );
 }
 
@@ -91,6 +78,8 @@ export function HomeView() {
   const account = useJson<AccountSummary>("/api/account");
   const extras = useJson<HomeExtrasResponse>("/api/home");
   const week = useJson<WeekSummary>("/api/week");
+  // WHY its own request: the latest few across months (on the 1st, "this month" has almost none).
+  const recent = useJson<TransactionSearch>(`/api/transactions?limit=${RECENT}`);
 
   return (
     <div className="h-full overflow-y-auto">
@@ -142,12 +131,17 @@ export function HomeView() {
         <InsightCards title="Coach insights" />
 
         {/* 4. Spending breakdown: the month in the 3 baskets (the 7-day view is one tap away) */}
-        <Section title="Spending breakdown" link={{ href: "/week", label: "Last 7 days" }}>
+        <CollapsibleSection
+          id="spending"
+          title="Spending breakdown"
+          defaultOpen={false}
+          aside={<SectionLink href="/week" label="Last 7 days" />}
+        >
           <SpendingBreakdown />
-        </Section>
+        </CollapsibleSection>
 
         {/* 5. Upcoming payments */}
-        <Section title="Upcoming payments">
+        <CollapsibleSection id="upcoming" title="Upcoming payments" defaultOpen={false}>
           {extras.error ? (
             <SectionError text={extras.error} />
           ) : extras.data ? (
@@ -162,18 +156,23 @@ export function HomeView() {
               <SkeletonRows rows={3} />
             </SkeletonGroup>
           )}
-        </Section>
+        </CollapsibleSection>
 
         {/* 6. Recent transactions */}
-        <Section title="Recent transactions" link={{ href: "/activity", label: "See all" }}>
-          {account.error ? (
-            <SectionError text={account.error} />
-          ) : account.data ? (
+        <CollapsibleSection
+          id="recent"
+          title="Recent transactions"
+          defaultOpen={false}
+          aside={<SectionLink href="/activity" label="See all" />}
+        >
+          {recent.error ? (
+            <SectionError text={recent.error} />
+          ) : recent.data ? (
             <div className="overflow-hidden rounded-2xl bg-surface shadow-sm">
-              {account.data.transactions.length > 0 ? (
-                <TransactionDayList txs={account.data.transactions.slice(0, RECENT)} today={account.data.asOf} />
+              {recent.data.transactions.length > 0 ? (
+                <TransactionDayList txs={recent.data.transactions} today={recent.data.asOf} />
               ) : (
-                <p className="p-4 text-sm text-muted">No transactions yet this month.</p>
+                <p className="p-4 text-sm text-muted">No transactions yet.</p>
               )}
             </div>
           ) : (
@@ -181,7 +180,7 @@ export function HomeView() {
               <SkeletonRows rows={RECENT} />
             </SkeletonGroup>
           )}
-        </Section>
+        </CollapsibleSection>
       </div>
     </div>
   );

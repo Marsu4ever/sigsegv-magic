@@ -6,6 +6,7 @@
  */
 import { useEffect, useId, useRef } from "react";
 import { Icon } from "./Icon";
+import { BackButton } from "./BackButton";
 
 /** Open sheets, oldest first. WHY: a sheet can open another (fixed costs → one payment); Esc closes only the top one. */
 const openSheets: string[] = [];
@@ -14,12 +15,15 @@ export function BottomSheet({
   label,
   title,
   onClose,
+  onBack,
   children,
 }: {
   /** Small grey line above the title, e.g. "Spending alert". */
   label?: string;
   title: string;
   onClose: () => void;
+  /** Set for a sheet opened from another sheet: a back button replaces ✕ (back = to that sheet). */
+  onBack?: () => void;
   children: React.ReactNode;
 }) {
   const id = useId();
@@ -49,18 +53,21 @@ export function BottomSheet({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
-          <div>
+          {onBack && <BackButton onClick={onBack} />}
+          <div className="min-w-0 flex-1">
             {label && <p className="text-xs font-medium text-muted">{label}</p>}
             <h2 className="mt-0.5 text-lg font-semibold leading-snug">{title}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
-          >
-            <Icon name="close" size={20} />
-          </button>
+          {!onBack && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+            >
+              <Icon name="close" size={20} />
+            </button>
+          )}
         </div>
         {children}
       </div>
