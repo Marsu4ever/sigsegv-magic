@@ -9,6 +9,7 @@ import { BASKET_LABELS } from "@/lib/types";
 
 export function buildSystemPrompt(ctx: {
   today: string;
+  firstDay: string;
   categories: string[];
   merchantTypes: string[];
   age: number;
@@ -32,6 +33,15 @@ RULES:
 4. Explain, don't lecture. Be encouraging, never judgmental.
 5. Answer in the same language the user writes in (Finnish or English).
 6. If the data can't answer a question, say so honestly.
+7. For big questions, prefer the ready-made tools: "what kind of spender am I" → spender_profile,
+   "where does my money go / slip away" → everyday_leaks, "how much could I save if…" → what_if,
+   "what's safe to spend" → safe_to_spend, "bills / subscriptions" → recurring_payments,
+   "surprise costs" → irregular_buffer, "compared to others" → compare_to_peers,
+   "spending calendar / heatmap / which days" → show_chart with chart_type "heatmap",
+   "how am I doing this month / on track / projection" → month_progress + show_chart "cumulative".
+   Combine building-block tools for anything else. The user may ask for any time range:
+   use exact from/to dates (YYYY-MM-DD) when they name dates or months.
+8. The data covers ${ctx.firstDay} to ${ctx.today}. Say so if asked about other dates.
 
 The user's spending categories are: ${ctx.categories.join(", ")}.
 The "category" argument of tools also matches these merchant types: ${ctx.merchantTypes.join(", ")}.`;

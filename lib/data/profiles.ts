@@ -34,6 +34,18 @@ export const SPENDING_TYPES: { type: SpendingType; label: string; rule: string }
   { type: "balanced", label: "Balanced", rule: "none of the above" },
 ];
 
+/** Applies the SPENDING_TYPES rules above, top to bottom. */
+export function classifySpendingType(
+  savingsRate: number,
+  share: Record<Basket, number>,
+): SpendingType {
+  if (savingsRate >= 0.15) return "saver";
+  if (savingsRate < 0) return "spends_more_than_earns";
+  if (share.everyday >= 0.37) return "everyday_heavy";
+  if (share.mandatory_regular >= 0.58) return "fixed_costs_heavy";
+  return "balanced";
+}
+
 export type CustomerProfile = {
   id: string;
   age: number;
@@ -79,16 +91,7 @@ export function profileFor(id: string): CustomerProfile | null {
   ) as Record<Basket, number>;
   const savingsRate = income ? (income - spending) / income : 0;
 
-  const type: SpendingType =
-    savingsRate >= 0.15
-      ? "saver"
-      : savingsRate < 0
-        ? "spends_more_than_earns"
-        : share.everyday >= 0.37
-          ? "everyday_heavy"
-          : share.mandatory_regular >= 0.58
-            ? "fixed_costs_heavy"
-            : "balanced";
+  const type = classifySpendingType(savingsRate, share);
 
   const r = (n: number) => Math.round(n);
   return {

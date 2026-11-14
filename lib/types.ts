@@ -19,11 +19,7 @@
  */
 export type Basket = "mandatory_regular" | "mandatory_irregular" | "everyday";
 
-export const BASKETS: Basket[] = [
-  "mandatory_regular",
-  "mandatory_irregular",
-  "everyday",
-];
+export const BASKETS: Basket[] = ["mandatory_regular", "mandatory_irregular", "everyday"];
 
 /** Human-readable basket names for the UI. */
 export const BASKET_LABELS: Record<Basket, string> = {
@@ -68,15 +64,37 @@ export type DateRange = { from: string; to: string };
  * WHY: the AI picks the chart TYPE and TITLE, but `rows` always come from
  * our own data functions, never typed by the AI. That keeps numbers exact.
  */
-export type ChartType = "bar" | "line" | "pie" | "table";
+/**
+ * "heatmap" = GitHub-style calendar of DAILY spending (rows must be one per
+ * day, label "YYYY-MM-DD"). Tapping it opens a month-by-month explorer.
+ * "cumulative" = month so far: running total per day of month, with a
+ * projection to month end and last month as a dashed line (month_progress).
+ */
+export type ChartType = "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative";
 
-export type ChartRow = { label: string; value: number };
+/**
+ * One row of a chart. `value2` is optional: when set, the chart compares two
+ * series side by side (e.g. "You" vs "Typical for your age").
+ */
+export type ChartRow = {
+  label: string;
+  value: number;
+  value2?: number;
+  /** "cumulative" charts: true = this value is a projection, not real yet. */
+  projected?: boolean;
+};
 
 export type ChartSpec = {
   type: ChartType;
   title: string;
   unit: string; // e.g. "€"
   rows: ChartRow[];
+  /** Names of the two series when rows have value2, e.g. ["You", "Typical"]. */
+  seriesNames?: [string, string];
+  /** Key numbers shown above/below the chart, e.g. "Spent so far: 1 421 €". */
+  facts?: { label: string; value: number }[];
+  /** A list shown under the chart in full screen (first 5, tap for more). */
+  items?: { label: string; sub?: string; value: number }[];
 };
 
 // ─── Chat ────────────────────────────────────────────────────────────────
@@ -100,6 +118,19 @@ export type ChatResponse = {
 };
 
 // ─── Week tab ────────────────────────────────────────────────────────────
+
+/** GET /api/day?date=YYYY-MM-DD response body (heatmap day details). */
+export type DaySpending = {
+  date: string;
+  totalEur: number;
+  incomeEur: number;
+  transactions: {
+    category: string;
+    merchantType: string | null;
+    amountEur: number; // positive = spent
+    basket: Basket;
+  }[];
+};
 
 /** GET /api/week response body. */
 export type WeekSummary = {

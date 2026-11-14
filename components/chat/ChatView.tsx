@@ -24,10 +24,13 @@ const CLIENT_TIMEOUT_MS = 120_000;
 
 // Suggested starter questions (from the challenge brief). Edit freely.
 const SUGGESTIONS = [
+  "What kind of spender am I?",
+  "Where does my money slip away?",
+  "How much could I save if I cut restaurants by 20%?",
+  "What's safe for me to spend this week?",
   "How are my 3 baskets looking?",
-  "What did I spend this week?",
-  "How much did I spend on taxis last month?",
-  "Show my spending trend",
+  "Show my spending calendar",
+  "How am I doing this month?",
 ];
 
 export function ChatView() {

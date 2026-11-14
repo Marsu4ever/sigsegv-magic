@@ -22,6 +22,8 @@ import {
 } from "recharts";
 import type { ChartSpec } from "@/lib/types";
 import { basketColor, colorFor } from "./colors";
+import { HeatmapExplorer, HeatmapPreview } from "./Heatmap";
+import { CumulativeChart } from "./Cumulative";
 
 export function formatValue(value: number, unit: string): string {
   return unit === "€"
@@ -48,23 +50,44 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   if (spec.rows.length === 0) {
     return <p className="py-6 text-center text-sm text-muted">No data for this period.</p>;
   }
+  if (spec.type === "heatmap") {
+    return compact ? <HeatmapPreview spec={spec} /> : <HeatmapExplorer spec={spec} />;
+  }
+  if (spec.type === "cumulative") return <CumulativeChart spec={spec} compact={compact} />;
 
   const monthly = isMonthly(spec.rows);
+  // Two series side by side (e.g. "You" vs "Typical")? Only when rows have value2.
+  const twoSeries = spec.rows.some((r) => r.value2 !== undefined);
+  const [name1, name2] = spec.seriesNames ?? ["A", "B"];
 
   if (spec.type === "table") {
     const rows = compact ? spec.rows.slice(0, 5) : spec.rows;
     return (
       <table className="w-full text-sm">
+        {twoSeries && (
+          <thead className="text-xs text-muted">
+            <tr>
+              <th />
+              <th className="text-right font-normal">{name1}</th>
+              <th className="text-right font-normal">{name2}</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.label} className="border-b border-line last:border-0">
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b border-line last:border-0">
               <td className="py-1.5 pr-2">{shortLabel(r.label, monthly)}</td>
               <td className="py-1.5 text-right tabular-nums">{formatValue(r.value, spec.unit)}</td>
+              {twoSeries && (
+                <td className="py-1.5 pl-2 text-right tabular-nums text-muted">
+                  {formatValue(r.value2 ?? 0, spec.unit)}
+                </td>
+              )}
             </tr>
           ))}
           {compact && spec.rows.length > 5 && (
             <tr>
-              <td colSpan={2} className="pt-1.5 text-xs text-muted">
+              <td colSpan={twoSeries ? 3 : 2} className="pt-1.5 text-xs text-muted">
                 +{spec.rows.length - 5} more — tap to see all
               </td>
             </tr>
@@ -82,9 +105,20 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
     .map((r, i) => ({
       ...r,
       label: shortLabel(r.label, monthly),
-      fill: spec.type === "pie" ? colorFor(r.label, i) : (basketColor(r.label) ?? "var(--accent)"),
+      // WHY no per-row fill with two series: it would paint both bars the same color.
+      ...(twoSeries
+        ? {}
+        : {
+            fill:
+              spec.type === "pie"
+                ? colorFor(r.label, i)
+                : (basketColor(r.label) ?? "var(--accent)"),
+          }),
     }));
-  const height = compact ? 160 : 320;
+  const SECOND_COLOR = "#a9b1a9";
+  const tiltLabels =
+    !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
+  const height = compact ? 160 : 340;
   const tooltip = <Tooltip formatter={(v) => formatValue(Number(v), spec.unit)} />;
 
   return (
@@ -109,24 +143,63 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} width={40} />
               {tooltip}
-              <Line dataKey="value" stroke="var(--accent)" strokeWidth={2} dot={!compact} />
+              <Line
+                dataKey="value"
+                name={name1}
+                stroke="var(--accent)"
+                strokeWidth={2}
+                dot={!compact && data.length <= 31}
+              />
+              {twoSeries && (
+                <Line
+                  dataKey="value2"
+                  name={name2}
+                  stroke={SECOND_COLOR}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )}
             </LineChart>
           ) : (
-            <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <BarChart
+              data={data}
+              margin={{ top: 8, right: 8, bottom: 0, left: tiltLabels ? 24 : 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis
                 dataKey="label"
                 tick={{ fontSize: 11 }}
                 // WHY: show every label only when they fit (≤ 12 bars).
                 interval={compact || data.length > 12 ? "preserveStartEnd" : 0}
+                // WHY: many word labels (categories) overlap — tilt them in full screen.
+                {...(tiltLabels ? { angle: -35, textAnchor: "end", height: 70 } : {})}
               />
               <YAxis tick={{ fontSize: 11 }} width={40} />
               {tooltip}
-              <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+              {twoSeries ? (
+                <>
+                  <Bar dataKey="value" name={name1} fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value2" name={name2} fill={SECOND_COLOR} radius={[4, 4, 0, 0]} />
+                </>
+              ) : (
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} />
+              )}
             </BarChart>
           )}
         </ResponsiveContainer>
       </div>
+      {twoSeries && spec.type !== "pie" && (
+        <ul className="mt-2 flex justify-center gap-4 text-xs">
+          <li className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--accent)" }} />
+            {name1}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: SECOND_COLOR }} />
+            {name2}
+          </li>
+        </ul>
+      )}
       {spec.type === "pie" && (
         // WHY a plain HTML legend: readable on small screens, wraps nicely.
         <ul className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs">
