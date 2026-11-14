@@ -12,6 +12,8 @@
  */
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { CountUp } from "@/components/ui/CountUp";
+import { tapHaptic } from "@/lib/haptic";
 import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
@@ -100,6 +102,9 @@ export function ChatView() {
   // WHY wait for both before showing the start screen (skeleton meanwhile): they used to
   // pop in one by one after the page had drawn, pushing everything down.
   const [startReady, setStartReady] = useState(false);
+  // Greeting by the time of day + one real number ("kept so far this month").
+  const greeting = useGreeting();
+  const [glance, setGlance] = useState<Glance | null>(null);
   useEffect(() => {
     const insights = fetch("/api/insights")
       .then((res) => (res.ok ? res.json() : null))
@@ -116,6 +121,12 @@ export function ChatView() {
       })
       .catch((err) => console.error("[insights]", err));
 
+    // Greeting's number ("kept so far this month"), loaded with the rest of the start screen.
+    const glanceP = fetch("/api/glance")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: Glance | null) => json && setGlance(json))
+      .catch((err) => console.error("[glance]", err));
+
     // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
     // On failure the chip is just left out — the other suggestions still work.
     const chip = fetch("/api/what-if/suggestion")
@@ -126,7 +137,7 @@ export function ChatView() {
       })
       .catch((err) => console.error("[what-if suggestion]", err)); // browser DevTools console
 
-    Promise.allSettled([insights, chip]).then(() => setStartReady(true));
+    Promise.allSettled([insights, chip, glanceP]).then(() => setStartReady(true));
   }, []);
 
   const suggestions = whatIfChip
@@ -306,9 +317,11 @@ export function ChatView() {
           <div className="mx-auto max-w-md space-y-5 px-1 pt-6">
             <div className="flex flex-col items-center text-center">
               <LogoMark size={52} />
-              <h2 className="mt-3 text-xl font-semibold">Hi! I&apos;m your money coach.</h2>
+              <h2 className="mt-3 text-xl font-semibold">{greeting}</h2>
+              {/* One real number up front, so the app feels like it knows you. */}
+              {glance && <GlanceLine glance={glance} />}
               <p className="mt-1 text-sm text-muted">
-                Ask anything — I answer with your real numbers.
+                I&apos;m your money coach. Ask anything, I answer with your real numbers.
               </p>
             </div>
 
@@ -325,16 +338,25 @@ export function ChatView() {
                 <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
                   {suggestions.map((s) => (
                     <li key={s}>
+                      {/* Hover / press: soft green row, the icon tile fills green, the arrow
+                          nudges right. WHY active: too: phones have no hover. */}
                       <button
                         type="button"
-                        onClick={() => send(s)}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-background active:bg-background"
+                        onClick={() => {
+                          tapHaptic();
+                          send(s);
+                        }}
+                        className="group flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors duration-150 hover:bg-accent/5 active:bg-accent/10"
                       >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent transition-all duration-200 group-hover:bg-accent group-hover:text-accent-foreground group-active:scale-90 group-active:bg-accent group-active:text-accent-foreground">
                           <Icon name={suggestionIcon(s)} size={17} />
                         </span>
-                        <span className="flex-1">{s}</span>
-                        <Icon name="chevron" size={16} className="text-muted" />
+                        <span className="flex-1 transition-colors group-hover:text-accent">{s}</span>
+                        <Icon
+                          name="chevron"
+                          size={16}
+                          className="text-muted transition-transform duration-200 group-hover:translate-x-1 group-hover:text-accent group-active:translate-x-1.5"
+                        />
                       </button>
                     </li>
                   ))}
@@ -385,8 +407,11 @@ export function ChatView() {
               key={s}
               type="button"
               disabled={loading}
-              onClick={() => send(s)}
-              className="shrink-0 whitespace-nowrap rounded-full border border-line bg-background px-3 py-1.5 text-sm disabled:opacity-40"
+              onClick={() => {
+                tapHaptic();
+                send(s);
+              }}
+              className="shrink-0 whitespace-nowrap rounded-full border border-line bg-background px-3 py-1.5 text-sm transition-colors hover:border-accent hover:text-accent active:scale-95 disabled:opacity-40"
             >
               {s}
             </button>
@@ -402,5 +427,50 @@ export function ChatView() {
         suggestionsOpen={suggestionsOpen}
       />
     </div>
+  );
+}
+
+// ─── Greeting ────────────────────────────────────────────────────────────
+
+/** This month so far, from /api/glance. */
+type Glance = { keptEur: number; spentEur: number };
+
+/**
+ * "Good morning / afternoon / evening" by the phone's clock.
+ * WHY after mount: the server doesn't know the user's time zone, so the first render
+ * says "Hi!" and the real greeting follows (no hydration mismatch).
+ */
+function useGreeting(): string {
+  const [text, setText] = useState("Hi!");
+  useEffect(() => {
+    const h = new Date().getHours();
+    const id = setTimeout(
+      () => setText(h < 5 ? "Good evening!" : h < 12 ? "Good morning!" : h < 18 ? "Good afternoon!" : "Good evening!"),
+      0,
+    );
+    return () => clearTimeout(id);
+  }, []);
+  return text;
+}
+
+const eur0 = (n: number) => `${Math.round(n).toLocaleString("fi-FI")} €`;
+
+/** "You've kept 516 € so far this month 🌱" (or what's been spent, if nothing is kept yet). */
+function GlanceLine({ glance }: { glance: Glance }) {
+  const kept = glance.keptEur > 0;
+  return (
+    <p className="mt-1 text-[15px]">
+      {kept ? "You've kept " : "You've spent "}
+      <span className={`font-semibold tabular-nums ${kept ? "text-money-in" : ""}`}>
+        <CountUp
+          value={kept ? glance.keptEur : glance.spentEur}
+          format={eur0}
+          duration={900}
+          delay={150}
+          fixedWidth
+        />
+      </span>
+      {kept ? " so far this month 🌱" : " so far this month"}
+    </p>
   );
 }

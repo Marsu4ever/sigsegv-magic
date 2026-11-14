@@ -35,6 +35,7 @@ import type { ToolDefinition } from "./llm";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import {
   PERIODS,
+  addMonths,
   basketBreakdown,
   listTransactions,
   periodToRange,
@@ -43,12 +44,17 @@ import {
   type Period,
 } from "@/lib/data";
 import {
+  MONEY_MEASURES,
   balanceOverTime,
   comparePeriods,
   incomeSummary,
   largestTransactions,
+  moneyOverTime,
+  summarize,
   transactionRows,
+  type MoneyMeasure,
 } from "@/lib/data/money";
+import { startOfMonth } from "@/lib/data/dates";
 import { compareToPeers, getBenchmarks } from "@/lib/insights/benchmarks";
 import { everydayLeaks, habitSkipOne } from "@/lib/insights/leaks";
 import { irregularBuffer } from "@/lib/insights/irregular";
@@ -102,8 +108,14 @@ const periodProps = {
     enum: [...PERIODS],
     description: "Named time period, relative to today in the data.",
   },
-  from: { type: "string", description: "Optional exact start date YYYY-MM-DD. Overrides period." },
-  to: { type: "string", description: "Optional exact end date YYYY-MM-DD. Overrides period." },
+  months: {
+    type: "number",
+    description:
+      "Optional: the last N calendar months up to today in the data, e.g. 7 for 'last 7 months' " +
+      "(includes the current month). Overrides period. Use this instead of doing date math.",
+  },
+  from: { type: "string", description: "Optional exact start date YYYY-MM-DD. Overrides period/months." },
+  to: { type: "string", description: "Optional exact end date YYYY-MM-DD. Overrides period/months." },
 };
 
 /**
@@ -116,6 +128,13 @@ function rangeFrom(args: Args, fallback: Period, keys = ["period", "from", "to"]
     ? (args[p] as Period)
     : fallback;
   const range = periodToRange(period);
+  // "Last N months" — only for the main period (not compare_periods' second one).
+  const months = Number(args.months);
+  if (p === "period" && Number.isFinite(months) && months >= 1) {
+    const today = periodToRange("this_month").to;
+    range.from = startOfMonth(addMonths(today, -(Math.min(Math.round(months), 36) - 1)));
+    range.to = today;
+  }
   if (typeof args[f] === "string" && DATE_RE.test(args[f] as string))
     range.from = args[f] as string;
   if (typeof args[t] === "string" && DATE_RE.test(args[t] as string)) range.to = args[t] as string;
@@ -216,7 +235,40 @@ const TOOLS: Tool[] = [
       const range = rangeFrom(a, "last_90_days");
       const g = a.group_by;
       const groupBy = g === "day" || g === "week" || g === "month" ? g : "week";
-      return { range, rows: spendOverTime(range, groupBy, optString(a.category)) };
+      const rows = spendOverTime(range, groupBy, optString(a.category));
+      // WHY a summary: so the model never adds up or averages rows itself.
+      return { range, rows, summary: summarize(rows, "spendingEur", true) };
+    },
+  },
+  {
+    name: "money_over_time",
+    description:
+      "THE general tool for anything over time: income, spending, kept (income minus spending), " +
+      "income_vs_spending (both side by side) or balance, per day, week or month, for any range " +
+      "(months: N for 'last N months', or period/from/to). Optional category or basket filter " +
+      "(applies to spending). Covers all the data history (about 2 years). Returns one row per " +
+      "day/week/month plus a summary (totals, average, highest, lowest) — use those numbers, " +
+      "never add up rows yourself. Draw it with show_chart (bar, or line for balance).",
+    properties: {
+      ...periodProps,
+      measure: { type: "string", enum: [...MONEY_MEASURES] },
+      group_by: { type: "string", enum: ["day", "week", "month"], description: "Default month." },
+      category: { type: "string", description: "Spending only, e.g. 'restaurants'." },
+      basket: { type: "string", enum: [...BASKETS], description: "Spending only." },
+    },
+    required: ["measure"],
+    chartable: true,
+    run: (a) => {
+      const range = rangeFrom(a, "last_90_days");
+      const measure = (MONEY_MEASURES as readonly string[]).includes(String(a.measure))
+        ? (a.measure as MoneyMeasure)
+        : "income_vs_spending";
+      const g = a.group_by;
+      const groupBy = g === "day" || g === "week" ? g : "month";
+      return moneyOverTime(range, measure, groupBy, {
+        category: optString(a.category),
+        basket: optBasket(a.basket),
+      });
     },
   },
   {
@@ -589,6 +641,51 @@ const CHART_TYPES = [
 ] as const;
 const CHARTABLE = TOOLS.filter((t) => t.chartable).map((t) => t.name);
 
+/**
+ * Does this tool take the shared period/months range? (what_if_spending's own `months`
+ * means something else, so it must not get the user's "N months" injected.)
+ */
+export function usesMonthsRange(name: string): boolean {
+  return BY_NAME.get(name)?.properties.months === periodProps.months;
+}
+
+/** Can this tool's result be drawn with show_chart? */
+export function isChartable(name: string): boolean {
+  return CHARTABLE.includes(name);
+}
+
+/**
+ * Chart type + title for drawing a data tool's result when the model forgot show_chart.
+ * WHY plain words: the title is all the user sees about what the chart is.
+ */
+export function autoChartArgs(tool: string, args: Args): { chart_type: ChartType; title: string } {
+  const months = Number(args.months);
+  const span = Number.isFinite(months) && months >= 1 ? `, last ${Math.round(months)} months` : "";
+  if (tool === "money_over_time") {
+    const what: Record<string, string> = {
+      income: "Income",
+      spending: "Spending",
+      kept: "Money kept",
+      income_vs_spending: "Income vs spending",
+      balance: "Balance",
+    };
+    const per = args.group_by === "day" ? "per day" : args.group_by === "week" ? "per week" : "per month";
+    const measure = String(args.measure);
+    return {
+      chart_type: measure === "balance" ? "line" : "bar",
+      title: `${what[measure] ?? "Income vs spending"} ${per}${span}`,
+    };
+  }
+  if (tool === "balance_over_time") return { chart_type: "line", title: `Balance${span}` };
+  if (tool === "spender_profile") return { chart_type: "pie", title: "Your spending by basket (%)" };
+  if (tool === "spend_over_time") {
+    const cat = typeof args.category === "string" && args.category.trim() ? args.category.trim() : "";
+    const name = cat ? cat[0].toUpperCase() + cat.slice(1) : "Spending";
+    return { chart_type: "bar", title: `${name} over time${span}` };
+  }
+  return { chart_type: "bar", title: "Your numbers" };
+}
+
 /** Every argument any chartable tool accepts — show_chart's data_args schema. */
 const ALL_DATA_ARG_PROPS = Object.assign(
   {},
@@ -706,9 +803,11 @@ function forLlm(full: ToolOutput): string {
   // WHY rename value/value2 to the series names ("You" / "Typical age 26-35"):
   // with bare value/value2 the model mixed up which number was whose.
   const names = out.seriesNames;
+  // WHY drop tone/tone2: colours are for the screen.
+  const plain = out.rows?.map(({ tone: _t, tone2: _t2, ...r }) => (void _t, void _t2, r));
   const rows = names
-    ? out.rows?.map(({ value, value2, ...rest }) => ({ ...rest, [names[0]]: value, [names[1]]: value2 }))
-    : out.rows;
+    ? plain?.map(({ value, value2, ...rest }) => ({ ...rest, [names[0]]: value, [names[1]]: value2 }))
+    : plain;
   if (rows) out.rows = rows as ChartRow[];
   if (!rows || rows.length <= MAX_ROWS_FOR_LLM) return JSON.stringify(out);
   const step = Math.ceil(rows.length / MAX_ROWS_FOR_LLM);
@@ -785,6 +884,7 @@ export function runTool(name: string, args: Args): ToolResult {
     });
     const chart: ChartSpec = {
       type,
+      source: { tool: dataTool.name, args: dataArgs as Args },
       // WHY fixed for "leaks": the team picked this title (shown in italics).
       title:
         type === "leaks" ? "Where my money slips away 💸" : (optString(args.title) ?? "Your spending"),

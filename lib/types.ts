@@ -23,8 +23,9 @@ export const BASKETS: Basket[] = ["mandatory_regular", "mandatory_irregular", "e
 
 /** Human-readable basket names for the UI. */
 export const BASKET_LABELS: Record<Basket, string> = {
-  mandatory_regular: "Mandatory & regular",
-  mandatory_irregular: "Mandatory & irregular",
+  // WHY short (team call, 14 Nov): same words as the Week tab; "Mandatory &" was long and stiff.
+  mandatory_regular: "Regular",
+  mandatory_irregular: "Surprising expenses",
   everyday: "Everyday spending",
 };
 
@@ -201,6 +202,11 @@ export type ChartRow = {
 export type ChartSpec = {
   type: ChartType;
   title: string;
+  /**
+   * Which data tool + arguments made this chart (set by show_chart). Sent back with the
+   * history so a follow-up like "show it over 12 months" knows what "it" was.
+   */
+  source?: { tool: string; args: Record<string, unknown> };
   unit: string; // e.g. "€"
   rows: ChartRow[];
   /** Names of the two series when rows have value2, e.g. ["You", "Typical"]. */

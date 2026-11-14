@@ -61,13 +61,25 @@ export function splitMoney(text: string): (string | { amount: string; tone?: "in
   return parts;
 }
 
+/**
+ * A colored amount in a reply; savings glow once (app/globals.css, "Delight").
+ * WHY no count-up here (tried 14 Nov): a number changing width mid-sentence made the
+ * whole reply jump or left a gap. Big standalone numbers still count up (CountUp).
+ */
+function AnimatedAmount({ amount, tone }: { amount: string; tone: "in" | "out" }) {
+  return tone === "in" ? <span className="save-glow">{amount}</span> : <>{amount}</>;
+}
+
 export function MoneyText({
   text,
   colors = true,
+  animate = false,
 }: {
   text: string;
   /** false = amounts bold but not green/red (calmer, e.g. the Account tab's hook tiles). */
   colors?: boolean;
+  /** true = savings glow once when they appear (chat replies). */
+  animate?: boolean;
 }) {
   return (
     <>
@@ -79,7 +91,7 @@ export function MoneyText({
             key={i}
             className={`font-semibold ${!colors ? "" : p.tone === "in" ? "text-money-in" : "text-money-out"}`}
           >
-            {p.amount}
+            {animate && p.tone ? <AnimatedAmount amount={p.amount} tone={p.tone} /> : p.amount}
           </span>
         ) : (
           // WHY plain: no sign = the model wrapped a neutral amount (a balance, a price), which the
