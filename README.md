@@ -69,6 +69,7 @@ Insights  ── GET /api/insights ───────► lib/insights/proacti
 Week      ── GET /api/week ───────────► lib/data → getWeekSummary()   (no AI; Home + /week)
 Home loan ── GET /api/mortgage ───────► lib/data/mortgage.ts → getMortgageSummary()   (no AI)
 What-if   ── GET /api/what-if ────────► lib/insights/whatIfForecast.ts   (toggle + category buttons, no AI)
+Goal      ── GET/POST /api/goal ──────► lib/goals/ → goalView() / applyGoalAction()   (saving goal + weekly mission, no AI; state in a cookie)
 ```
 
 1. User asks _"How much did I spend on taxis last month?"_

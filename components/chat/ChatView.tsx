@@ -11,6 +11,7 @@
  * localStorage later if needed.
  */
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useGoal } from "@/components/goal/api";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CountUp } from "@/components/ui/CountUp";
 import { tapHaptic } from "@/lib/haptic";
@@ -36,7 +37,7 @@ const SUGGESTIONS = [
   "What kind of spender am I?",
   "Where does my money slip away?",
   "What's safe for me to spend this week?",
-  "How are my 3 baskets looking?",
+  "What's happening with my spending types?",
   "Show my spending calendar",
   "How am I doing this month?",
 ];
@@ -50,9 +51,10 @@ function suggestionIcon(text: string): IconName {
   if (q.includes("slip")) return "coins";
   if (q.includes("what if")) return "sliders";
   if (q.includes("safe")) return "shield";
-  if (q.includes("basket")) return "basket";
+  if (q.includes("basket") || q.includes("spending type")) return "basket";
   if (q.includes("calendar")) return "calendar";
   if (q.includes("this month")) return "trend";
+  if (q.includes("goal") || q.includes("save for")) return "piggy";
   return "sparkles";
 }
 
@@ -96,6 +98,7 @@ export function ChatView() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
   // The lightbulb next to the text box: suggested questions again, mid-conversation.
+  const goal = useGoal();
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   // Set when a question came from another screen (?ask=): the header then shows a back button.
   const [fromLink, setFromLink] = useState(false);
@@ -143,9 +146,12 @@ export function ChatView() {
     Promise.allSettled([insights, chip, glanceP]).then(() => setStartReady(true));
   }, []);
 
-  const suggestions = whatIfChip
+  // Saving goal chip (lib/goals): start one, or ask how it's going. Added once the goal has loaded.
+  const goalChip = goal.view ? (goal.view.goal ? "How is my goal going?" : "Help me save for something") : null;
+  const base = whatIfChip
     ? [...SUGGESTIONS.slice(0, WHAT_IF_CHIP_AT), whatIfChip, ...SUGGESTIONS.slice(WHAT_IF_CHIP_AT)]
     : SUGGESTIONS;
+  const suggestions = goalChip ? [...base.slice(0, 1), goalChip, ...base.slice(1)] : base;
 
   // WHY leave out what was already asked: the lightbulb should offer what the user
   // hasn't explored yet. If they've asked everything, show the full list again.

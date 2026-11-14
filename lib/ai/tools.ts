@@ -17,6 +17,8 @@
  *   step (spender_profile, everyday_leaks, what_if, safe_to_spend, …)
  * - home loan: mortgage_status (+ mortgage_financing for charts), from
  *   lib/data/mortgage.ts. { hasMortgage: false } for customers who never applied.
+ * - saving goal: goal_status (read) and plan_goal (a draft the USER saves with a button —
+ *   the AI never creates a goal itself), from lib/goals/ (DECISIONS.md #60).
  *
  * TO ADD A TOOL: write the function in lib/data or lib/insights, then add one
  * entry to TOOLS below. If it returns `rows`, set chartable: true and it can
@@ -28,6 +30,7 @@ import type {
   ChartSpec,
   ChartType,
   DateRange,
+  GoalDraft,
   MoneyTone,
   WhatIf,
 } from "@/lib/types";
@@ -68,6 +71,11 @@ import { getMortgageSummary } from "@/lib/data/mortgage";
 import { proactiveInsights } from "@/lib/insights/proactive";
 import { getWhatIf, parseCutPct, parseMonths } from "@/lib/insights/whatIfForecast";
 import { availableNames, resolveTarget, targetFromNames } from "@/lib/insights/targets";
+import { planGoal, simToday } from "@/lib/goals/goal";
+import { getGoalState } from "@/lib/goals/state";
+
+const getGoalToday = () => simToday(getGoalState());
+import { goalView } from "@/lib/goals/view";
 
 type Args = Record<string, unknown>;
 
@@ -87,6 +95,8 @@ type ToolOutput = Record<string, unknown> & {
   periodLabel?: string;
   /** Opens the what-if view (ChatMessage.whatIf). Not sent to the LLM. */
   whatIf?: WhatIf;
+  /** "Save goal" card under the reply (ChatMessage.goalDraft). Not sent to the LLM. */
+  goalDraft?: GoalDraft;
 };
 
 type Tool = {
@@ -139,6 +149,19 @@ function rangeFrom(args: Args, fallback: Period, keys = ["period", "from", "to"]
     range.from = args[f] as string;
   if (typeof args[t] === "string" && DATE_RE.test(args[t] as string)) range.to = args[t] as string;
   return range;
+}
+
+/**
+ * A goal date the model put in the past → the same day a year later.
+ * WHY: asked "by June" on 30 Sep 2026, Qwen sent 2026-06-30; the user means next June.
+ */
+function nextIfPast(v: unknown): unknown {
+  if (typeof v !== "string" || !DATE_RE.test(v) && !/^\d{4}-\d{2}$/.test(v)) return v;
+  const today = getGoalToday();
+  if (v.slice(0, 7) >= today.slice(0, 7)) return v;
+  const [y, ...rest] = v.split("-");
+  const next = [String(Number(y) + 1), ...rest].join("-");
+  return next.slice(0, 7) >= today.slice(0, 7) ? next : v;
 }
 
 function optString(v: unknown): string | undefined {
@@ -586,6 +609,98 @@ const TOOLS: Tool[] = [
     run: () => ({ insights: proactiveInsights() }),
   },
 
+  // ── Saving goal (lib/goals/) ───────────────────────────────────────────
+  {
+    name: "goal_status",
+    description:
+      "The user's saving goal and weekly mission: goal name, target, how much is saved (only money the user " +
+      "moved counts), weekly amount needed from now, days ahead of plan, this week's mission (limit, spent, " +
+      "left, days left), mission choices if none is picked, the last week's result, level and weeks won. " +
+      "hasGoal=false if they have none.",
+    properties: {},
+    chartable: false,
+    run: () => {
+      const v = goalView();
+      const g = v.goal;
+      const m = v.mission;
+      return {
+        hasGoal: !!g,
+        ...(g
+          ? {
+              goal: {
+                name: g.name,
+                targetEur: g.targetEur,
+                savedEur: g.savedEur,
+                remainingEur: g.remainingEur,
+                byDate: g.byDate,
+                weeklyNeededEur: g.weeklyNeededEur,
+                daysAheadOfPlan: g.daysAhead,
+                reached: g.reached,
+              },
+            }
+          : {}),
+        level: v.level,
+        weeksWon: v.weeksWon,
+        missionWeek: v.week,
+        mission: m
+          ? {
+              title: m.title,
+              habit: m.habit,
+              usualWeekEur: m.baselineEur,
+              limitEur: m.capEur,
+              spentEur: m.spentEur,
+              leftEur: m.leftEur,
+              daysLeft: m.daysLeft,
+              status: m.status,
+            }
+          : null,
+        // WHY a separate note: Qwen read the first choice as "your current mission".
+        ...(m || !g
+          ? {}
+          : {
+              missionNote: "No mission picked this week yet. The user picks one of these on the This week page (tap the goal on Home).",
+              missionChoices: v.candidates.map((c) => ({ title: c.title, usualWeekEur: c.baselineEur, keepsEur: c.keepsEur })),
+            }),
+        lastWeek: v.result,
+        whereToSeeIt: "the This week page (Home → tap the goal)",
+      };
+    },
+  },
+  {
+    name: "plan_goal",
+    description:
+      "Use when the user wants to save for something with an amount and a date. Checks the goal and works out " +
+      "the weekly amount needed, how that compares with what they usually keep per week, and a later date if it's " +
+      "a stretch. The app then shows a card with a Save button: the USER saves it, you never say it is saved.",
+    properties: {
+      name: { type: "string", description: "Short goal name in the user's words, e.g. 'Trip to Lisbon'." },
+      amount_eur: { type: "number", description: "Target amount in euros." },
+      by_date: {
+        type: "string",
+        description: "Deadline YYYY-MM-DD (a month alone → its last day, the next one after today in the data).",
+      },
+      already_saved_eur: { type: "number", description: "Only if the user said they already have some set aside." },
+    },
+    required: ["name", "amount_eur", "by_date"],
+    chartable: false,
+    run: (a) => {
+      // WHY aliases: Qwen sent {amount, date} instead of {amount_eur, by_date} in testing.
+      const draft = planGoal(
+        {
+          name: a.name ?? a.goal,
+          amountEur: a.amount_eur ?? a.amount,
+          byDate: nextIfPast(a.by_date ?? a.date ?? a.deadline),
+          startEur: a.already_saved_eur ?? a.already_saved,
+        },
+        getGoalState(),
+      );
+      // WHY saved:false spelled out: Qwen still wrote "the goal is now set" without it.
+      return draft.error
+        ? draft
+        : { ...draft, saved: false, nextStep: "The user taps Save on the card under your reply.", goalDraft: draft };
+    },
+  },
+
   // ── Home loan ──────────────────────────────────────────────────────────
   {
     name: "mortgage_status",
@@ -677,7 +792,7 @@ export function autoChartArgs(tool: string, args: Args): { chart_type: ChartType
     };
   }
   if (tool === "balance_over_time") return { chart_type: "line", title: `Balance${span}` };
-  if (tool === "spender_profile") return { chart_type: "pie", title: "Your spending by basket (%)" };
+  if (tool === "spender_profile") return { chart_type: "pie", title: "Your spending by type (%)" };
   if (tool === "spend_over_time") {
     const cat = typeof args.category === "string" && args.category.trim() ? args.category.trim() : "";
     const name = cat ? cat[0].toUpperCase() + cat.slice(1) : "Spending";
@@ -749,6 +864,8 @@ export type ToolResult = {
   chart?: ChartSpec;
   /** Set only by what_if_spending — opens the what-if view. */
   whatIf?: WhatIf;
+  /** Set only by plan_goal — the "Save goal" card. */
+  goalDraft?: GoalDraft;
 };
 
 /** Max rows sent to the LLM. WHY: e.g. 2 years of daily balances = 730 rows of tokens. */
@@ -794,8 +911,10 @@ function forLlm(full: ToolOutput): string {
     basketTree: _sameAsBaskets,
     view: _screenOnly,
     whatIf: _whatIf,
+    goalDraft: _goalDraft,
     ...out
   } = full;
+  void _goalDraft;
   void _unused;
   void _sameAsBaskets;
   void _screenOnly;
@@ -836,6 +955,7 @@ export function runTool(name: string, args: Args): ToolResult {
     return {
       content: forLlm(out),
       ...(out.whatIf ? { whatIf: out.whatIf } : {}),
+      ...(out.goalDraft ? { goalDraft: out.goalDraft } : {}),
       ...(chart ? { chart } : {}),
     };
   }

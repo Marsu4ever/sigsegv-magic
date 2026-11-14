@@ -8,7 +8,7 @@
  * Used automatically when LLM_BASE_URL / LLM_MODEL are not set, or AI_MODE=mock.
  * The real AI understands any wording; the mock only reacts to the keywords below.
  */
-import type { ChartSpec, ChatMessage, ChartType, WhatIf } from "@/lib/types";
+import type { ChartSpec, ChatMessage, ChartType, GoalDraft, WhatIf } from "@/lib/types";
 import { FORECAST_PERIOD_TEXT } from "@/lib/types";
 import { allMerchantTypes, listCategories } from "@/lib/data";
 import { resolveTarget } from "@/lib/insights/targets";
@@ -80,6 +80,47 @@ function whatIfText(w: WhatIf): string {
   return `${none}In a typical month you spend about ${minus(a.perMonthEur)} on ${what} (average of ${basis}), ${estimate}. ${save}`;
 }
 
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+/**
+ * "Save 1000 for a trip to Lisbon by June" → plan_goal arguments, or null when there's no amount.
+ * WHY only in the mock: the real AI reads any wording; this covers the demo sentence.
+ */
+function parseGoal(text: string, today: string): { name: string; amount_eur: number; by_date: string } | null {
+  const q = text.toLowerCase();
+  const num = q.match(/(\d[\d\s]*(?:[.,]\d+)?)\s*(k\b)?/);
+  if (!num) return null;
+  let amount = Number(num[1].replace(/\s/g, "").replace(",", "."));
+  if (num[2]) amount *= 1000;
+  const [y, m] = today.split("-").map(Number);
+  let by = q.match(/\b(\d{4}-\d{2}(?:-\d{2})?)\b/)?.[1];
+  const month = MONTHS.findIndex((name) => q.includes(name));
+  if (!by && month >= 0) {
+    const year = month + 1 > m ? y : y + 1; // the next such month after today
+    by = new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+  }
+  if (!by) by = new Date(Date.UTC(y, m - 1 + 7, 0)).toISOString().slice(0, 10); // ~6 months
+  const name =
+    text
+      .match(/\bfor (?:a |an |the |my )?(.+?)(?= by\b| in\b|[.?!]|$)/i)?.[1]
+      // WHY only money amounts: "iphone 13" must keep its 13.
+      ?.replace(/\d[\d\s]*(?:[.,]\d+)?\s*(?:k\b|€|eur\w*|e\b)/gi, "")
+      .trim() ?? "";
+  return { name: name ? name[0].toUpperCase() + name.slice(1) : "My goal", amount_eur: amount, by_date: by };
+}
+
+/**
+ * The reply under a "Save goal" card, written by code from the draft (lib/goals numbers).
+ * Used by the mock and by chat.ts when the real model leaves the text empty.
+ */
+export function goalDraftText(d: GoalDraft): string {
+  const kept =
+    d.typicalKeptPerWeekEur !== null && d.typicalKeptPerWeekEur > 0
+      ? ` You usually keep about ${plus(d.typicalKeptPerWeekEur)} a week${d.stretch ? ", so this is a stretch" : ""}.`
+      : "";
+  return `That's about ${plus(d.weeklyNeededEur)} a week for ${d.weeksLeft} weeks.${kept} Save it below and I'll suggest one small mission a week.`;
+}
+
 /** Short "yes"-style answers, English and Finnish. */
 const YES = /^(yes|yeah|yep|yup|sure|ok|okay|please|go ahead|kyllä|joo|juu|näytä)\b/i;
 
@@ -113,6 +154,40 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
 function mockAnswer(history: ChatMessage[]): ChatMessage {
   const q = (history.at(-1)?.text ?? "").toLowerCase();
   const replyText = (text: string): ChatMessage => ({ role: "assistant", text: `[mock AI] ${text}`, charts: [] });
+  // Saving goal (lib/goals/). WHY before "help me save": "help me save for something" is a goal.
+  if (has(q, "my goal", "my mission", "goal going", "mission going")) {
+    const st = data("goal_status");
+    if (!st.hasGoal) return replyText("You don't have a saving goal yet. What are you saving for, how much and by when?");
+    const g = st.goal;
+    const m = st.mission;
+    const mission = m
+      ? ` This week: ${m.title}, ${eur0(m.leftEur)} left with ${m.daysLeft} days to go.`
+      : " Pick this week's mission on the This week page (tap the goal on Home).";
+    return replyText(`${g.name}: ${plus(g.savedEur)} of ${eur0(g.targetEur)} saved, ${plus(g.weeklyNeededEur)} a week gets you there.${mission}`);
+  }
+  // WHY the follow-up check: after "What are you saving for, how much?" the user answers
+  // "300 e for iphone 13" without the word "save" (an empty bubble in testing).
+  const prevAsked = history.findLast((m, i) => m.role === "assistant" && i < history.length - 1)?.text ?? "";
+  // Only an answer (a number, not a new question) to a reply that asked about a goal.
+  const goalAnswer =
+    /\b(sav(e|ing) for|goal)\b[^?]*\?/i.test(prevAsked) && /\d/.test(q) && !q.includes("?");
+  // WHY a regex: "save 1000 for a trip" has words between "save" and "for".
+  if (goalAnswer || /\b(save|saving)\b.*\bfor\b/.test(q) || has(q, "savings goal", "saving goal", "set a goal")) {
+    const today = data("goal_status").missionWeek.today as string;
+    const args = parseGoal(history.at(-1)?.text ?? "", today);
+    if (!args) {
+      return replyText("Nice! What are you saving for, how much, and by when? For example: 1000 € for a trip by June.");
+    }
+    const result = runTool("plan_goal", args);
+    const d = JSON.parse(result.content) as GoalDraft;
+    if (d.error) return replyText(d.error);
+    return {
+      role: "assistant",
+      text: `[mock AI] ${goalDraftText(d)}`,
+      charts: [],
+      goalDraft: result.goalDraft,
+    };
+  }
   // Proactive insights (lib/insights/proactive.ts): saving help and "what should I know".
   if (has(q, "save more", "how can i save", "how could i save", "help me save", "ways to save")) {
     const all = data("proactive_insights").insights as { kind: string; action: string; total?: { value: number } }[];
@@ -192,7 +267,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     return reply(
       `You're a "${p.type}" (${p.typeRule}). You keep ${Math.round(p.keptShare * 100)}% of your income. ` +
         `Small purchases under ${p.smallPurchasesLast90Days.maxEur} € add up to ${minus(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
-      chart("pie", "Your spending by basket (%)", "spender_profile"),
+      chart("pie", "Your spending by type (%)", "spender_profile"),
     );
   }
 
@@ -293,9 +368,9 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     );
   }
 
-  if (q.includes("basket")) {
+  if (q.includes("basket") || q.includes("spending type")) {
     // WHY 90 days: one month often has only 2–3 categories; 3 months shows the real mix.
-    const c = chart("baskets", "Your 3 baskets (last 90 days)", "basket_details", {
+    const c = chart("baskets", "Your spending types (last 90 days)", "basket_details", {
       period: "last_90_days",
     });
     const rows = c?.rows ?? [];

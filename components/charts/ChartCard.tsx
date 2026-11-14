@@ -24,10 +24,16 @@ export function ChartCard({ spec }: { spec: ChartSpec }) {
           <span className="text-sm font-semibold">
             <ChartTitle spec={spec} />
           </span>
-          {/* No "Expand" on the calendar (team call): the whole card is tappable. */}
+          {/* No arrows on the calendar (team call): the whole card is tappable. */}
           {spec.type !== "heatmap" && (
-            <span className="flex shrink-0 items-center gap-1 text-xs text-muted">
-              Expand <Icon name="expand" size={13} />
+            // Just the ⤢ arrows (no word); they glimmer now and then to hint "tap to open".
+            // WHY the delay from the title: cards in one chat don't all glimmer at once.
+            <span
+              className="expand-glimmer flex shrink-0 items-center text-muted"
+              style={{ animationDelay: `${(spec.title.length % 7) * 0.6 + 1.5}s` }}
+              aria-hidden
+            >
+              <Icon name="expand" size={15} />
             </span>
           )}
         </div>
