@@ -8,7 +8,7 @@ import { useEffect } from "react";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartTitle } from "./ChartTitle";
-import { BackButton } from "@/components/ui/BackButton";
+import { Icon } from "@/components/ui/Icon";
 
 export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: () => void }) {
   // Close with the Escape key (handy when testing on a laptop).
@@ -27,12 +27,19 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
         className="flex h-dvh w-full max-w-md flex-col bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center gap-2 border-b border-line px-4 py-2">
-          {/* WHY only a back button: the "← Back" pill and ✕ did the same thing. */}
-          <BackButton onClick={onClose} label="Back to the chat" />
+        {/* WHY only an X (no "← Back"): both did the same thing; matches BottomSheet. */}
+        <header className="flex items-center gap-2 border-b border-line py-3 pl-4 pr-2">
           <h2 className="min-w-0 flex-1 truncate font-semibold">
             <ChartTitle spec={spec} />
           </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+            aria-label="Close"
+          >
+            <Icon name="close" size={20} />
+          </button>
         </header>
         <div className="flex-1 overflow-y-auto p-4">
           <ChartRenderer spec={spec} compact={false} />
