@@ -11,7 +11,8 @@
  * localStorage later if needed.
  */
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, ChatResponse } from "@/lib/types";
+import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf } from "@/lib/types";
+import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
@@ -23,15 +24,29 @@ import { ChatInput } from "./ChatInput";
 const CLIENT_TIMEOUT_MS = 120_000;
 
 // Suggested starter questions (from the challenge brief). Edit freely.
+// The what-if chip is added at WHAT_IF_CHIP_AT once /api/what-if/suggestion answers.
 const SUGGESTIONS = [
   "What kind of spender am I?",
   "Where does my money slip away?",
-  "How much could I save if I cut restaurants by 20%?",
   "What's safe for me to spend this week?",
   "How are my 3 baskets looking?",
   "Show my spending calendar",
   "How am I doing this month?",
 ];
+
+const WHAT_IF_CHIP_AT = 2;
+
+/** GET /api/what-if/suggestion response. */
+type WhatIfSuggestion = { target: SpendingTarget };
+
+/**
+ * "What if I spent less on groceries?" — X is the customer's biggest everyday category.
+ * Opens the what-if view (chart + Month / 3 / 6 months + 5 / 10 / 20 %); the AI / mock finds X
+ * in the text. WHY no % in the chip: the user picks it under the chart.
+ */
+function whatIfChipText(s: WhatIfSuggestion): string {
+  return `What if I spent less on ${s.target.label.toLowerCase()}?`;
+}
 
 export function ChatView() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -39,6 +54,28 @@ export function ChatView() {
   const [mode, setMode] = useState<ChatResponse["mode"] | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // What-if mode: a reply with `whatIf` shows WhatIfPanel above the conversation.
+  const [whatIf, setWhatIf] = useState<WhatIf | null>(null);
+  // WHY a counter: used as the panel's React key, so each new what-if starts fresh.
+  const [whatIfKey, setWhatIfKey] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
+
+  // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
+  // On failure the chip is just left out — the other suggestions still work.
+  useEffect(() => {
+    fetch("/api/what-if/suggestion")
+      .then(async (res) => {
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`);
+        setWhatIfChip(whatIfChipText(json as WhatIfSuggestion));
+      })
+      .catch((err) => console.error("[what-if suggestion]", err)); // browser DevTools console
+  }, []);
+
+  const suggestions = whatIfChip
+    ? [...SUGGESTIONS.slice(0, WHAT_IF_CHIP_AT), whatIfChip, ...SUGGESTIONS.slice(WHAT_IF_CHIP_AT)]
+    : SUGGESTIONS;
 
   // Count seconds while waiting, so a slow answer is visibly "still working".
   useEffect(() => {
@@ -51,10 +88,35 @@ export function ChatView() {
     };
   }, [loading]);
 
+  // Set by addNotice: the next messages change must not scroll.
+  const skipScroll = useRef(false);
+
   // Keep the newest message in view.
   useEffect(() => {
+    if (skipScroll.current) {
+      skipScroll.current = false;
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  /** A note from the what-if panel, shown as a coach message (no AI involved). */
+  function addNotice(text: string) {
+    // WHY no auto-scroll: the user is looking at the what-if chart; jumping away would lose it.
+    skipScroll.current = true;
+    setMessages((m) => [...m, { role: "assistant", text }]);
+  }
+
+  // WHY after the auto-scroll above: otherwise scrolling to the newest message hides the
+  // chart the user just asked for.
+  useEffect(() => {
+    if (whatIfKey > 0) panelRef.current?.scrollIntoView({ block: "start" });
+  }, [whatIfKey]);
+
+  function showWhatIf(w: WhatIf) {
+    setWhatIf(w);
+    setWhatIfKey((k) => k + 1);
+  }
 
   async function send(text: string) {
     const next: ChatMessage[] = [...messages, { role: "user", text }];
@@ -80,7 +142,8 @@ export function ChatView() {
       if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
       const { reply, mode } = data as ChatResponse;
       setMode(mode);
-      setMessages([...next, reply]);
+      setMessages((m) => [...m, reply]); // WHY functional: keeps notes added while waiting
+      if (reply.whatIf) showWhatIf(reply.whatIf);
     } catch (err) {
       const text =
         err instanceof DOMException && err.name === "TimeoutError"
@@ -91,7 +154,7 @@ export function ChatView() {
               ? err.message
               : String(err);
       console.error("[chat]", err); // browser DevTools console
-      setMessages([...next, { role: "assistant", text: `⚠️ ${text}` }]);
+      setMessages((m) => [...m, { role: "assistant", text: `⚠️ ${text}` }]);
     } finally {
       setLoading(false);
     }
@@ -127,7 +190,7 @@ export function ChatView() {
           <div className="space-y-3 pt-6 text-center">
             <p className="text-muted">Ask anything about your money.</p>
             <div className="flex flex-col items-center gap-2">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button
                   key={s}
                   type="button"
@@ -138,6 +201,16 @@ export function ChatView() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+        {whatIf && (
+          <div ref={panelRef} className="scroll-mt-2">
+            <WhatIfPanel
+              key={whatIfKey}
+              initial={whatIf}
+              onClose={() => setWhatIf(null)}
+              onNotice={addNotice}
+            />
           </div>
         )}
         {messages.map((m, i) => (

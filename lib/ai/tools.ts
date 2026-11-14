@@ -22,7 +22,15 @@
  * entry to TOOLS below. If it returns `rows`, set chartable: true and it can
  * be drawn with show_chart automatically.
  */
-import type { Basket, ChartRow, ChartSpec, ChartType, DateRange, MoneyTone } from "@/lib/types";
+import type {
+  Basket,
+  ChartRow,
+  ChartSpec,
+  ChartType,
+  DateRange,
+  MoneyTone,
+  WhatIf,
+} from "@/lib/types";
 import type { ToolDefinition } from "./llm";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import {
@@ -51,6 +59,8 @@ import { safeToSpend } from "@/lib/insights/safeToSpend";
 import { spenderProfile } from "@/lib/insights/spenderProfile";
 import { whatIf } from "@/lib/insights/whatIf";
 import { getMortgageSummary } from "@/lib/data/mortgage";
+import { getWhatIf, parseCutPct, parseMonths } from "@/lib/insights/whatIfForecast";
+import { availableNames, resolveTarget, targetFromNames } from "@/lib/insights/targets";
 
 type Args = Record<string, unknown>;
 
@@ -68,6 +78,8 @@ type ToolOutput = Record<string, unknown> & {
   /** Screen data for the "leaks" chart (ChartSpec.leaks). */
   view?: ChartSpec["leaks"];
   periodLabel?: string;
+  /** Opens the what-if view (ChatMessage.whatIf). Not sent to the LLM. */
+  whatIf?: WhatIf;
 };
 
 type Tool = {
@@ -379,6 +391,41 @@ const TOOLS: Tool[] = [
     run: (a) => everydayLeaks(rangeFrom(a, "last_90_days"), clampNumber(a.max_eur, 1, 500, 20)),
   },
   {
+    // The what-if VIEW (chart + Month / 3 / 6 months toggle). The older what_if below
+    // stays as a sub-tool (per-month / per-year saving) for a later section of that view.
+    name: "what_if_spending",
+    description:
+      "Main tool for 'what if I spent less on X?'. Predicts the next 1, 3 or 6 months from the same-length past " +
+      "period (unchanged vs with a cut) and opens a what-if chart for the user. category: e.g. 'restaurants', " +
+      "'eating out' (= restaurants + cafes + takeaway), 'groceries', 'taxi'. only: optional list of exact " +
+      "categories or merchant types to narrow it, e.g. ['Cafes'] or ['Fast food'] (the result's breakdown shows " +
+      "what is inside). cut_pct: 5, 10 or 20, default 5 — the % the view opens on; the result's cutOptions " +
+      "has the saving for all three. months: 1, 3 or 6, default 1 — only set it if the user names " +
+      "a period. monthsWithData in the result says which periods have data.",
+    properties: {
+      category: { type: "string" },
+      only: { type: "array", items: { type: "string" } },
+      cut_pct: { type: "number" },
+      months: { type: "number", enum: [1, 3, 6] },
+    },
+    required: ["category"],
+    chartable: false,
+    run: (a) => {
+      const only = Array.isArray(a.only) ? a.only.map(String).filter(Boolean) : [];
+      const target = only.length ? targetFromNames(only) : resolveTarget(String(a.category ?? ""));
+      if (!target) {
+        // WHY list the options: the LLM can retry with a valid name instead of giving up.
+        return { error: "Unknown category", available: availableNames() };
+      }
+      // WHY default 1: the what-if view always opens on Month unless the user named a period.
+      const w = getWhatIf(target, parseMonths(a.months) ?? 1, parseCutPct(a.cut_pct));
+      // WHY no points for the LLM: it only needs totals + breakdown to write its sentence.
+      const { points: _points, ...summary } = w;
+      void _points;
+      return { ...summary, whatIf: w };
+    },
+  },
+  {
     name: "what_if",
     description:
       "Answers 'How much could I save if I cut X by N%?'. Uses average monthly spending over the period (default last 90 days) for a category/merchant type or a basket. change_percent: -20 = spend 20% less.",
@@ -550,6 +597,8 @@ export type ToolResult = {
   content: string;
   /** Set only by show_chart — the UI renders it. */
   chart?: ChartSpec;
+  /** Set only by what_if_spending — opens the what-if view. */
+  whatIf?: WhatIf;
 };
 
 /** Max rows sent to the LLM. WHY: e.g. 2 years of daily balances = 730 rows of tokens. */
@@ -591,13 +640,20 @@ function rowTone(tool: string, row: ChartRow, rows: ChartRow[]): MoneyTone | und
 }
 
 function forLlm(full: ToolOutput): string {
-  // WHY drop chartList: it's for the screen; the LLM already gets the same data.
+  // WHY drop chartList / whatIf: they're for the screen; the LLM already gets the same data.
   // basketTree is the same data as `baskets`, kept for the screen only.
   // `view` is the "leaks" chart's screen data (every small purchase etc.).
-  const { chartList: _unused, basketTree: _sameAsBaskets, view: _screenOnly, ...out } = full;
+  const {
+    chartList: _unused,
+    basketTree: _sameAsBaskets,
+    view: _screenOnly,
+    whatIf: _whatIf,
+    ...out
+  } = full;
   void _unused;
   void _sameAsBaskets;
   void _screenOnly;
+  void _whatIf;
   // WHY rename value/value2 to the series names ("You" / "Typical age 26-35"):
   // with bare value/value2 the model mixed up which number was whose.
   const names = out.seriesNames;
@@ -616,7 +672,10 @@ function forLlm(full: ToolOutput): string {
 
 export function runTool(name: string, args: Args): ToolResult {
   const tool = BY_NAME.get(name);
-  if (tool) return { content: forLlm(tool.run(args)) };
+  if (tool) {
+    const out = tool.run(args);
+    return { content: forLlm(out), ...(out.whatIf ? { whatIf: out.whatIf } : {}) };
+  }
 
   if (name === "show_chart") {
     const dataTool = BY_NAME.get(String(args.data_tool));

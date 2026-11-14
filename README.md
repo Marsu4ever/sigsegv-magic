@@ -40,12 +40,12 @@ shown with a yellow "mock AI" badge). Everything works without any keys.
 
 Click the small **🛠** in the far bottom-right corner of the browser window (or open these while `npm run dev` runs):
 
-| Page | What's there |
-|---|---|
-| http://localhost:3000/dev | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
-| http://localhost:3000/data | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data |
-| http://localhost:3000/customer_profiles | All demo customers grouped by spending type (home-loan customers listed first), with a **Use in app** button |
-| http://localhost:3000/api/health | Is the data loading? Which AI settings are active? |
+| Page                                    | What's there                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| http://localhost:3000/dev               | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
+| http://localhost:3000/data              | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data      |
+| http://localhost:3000/customer_profiles | All demo customers grouped by spending type (home-loan customers listed first), with a **Use in app** button                      |
+| http://localhost:3000/api/health        | Is the data loading? Which AI settings are active?                                                                                |
 
 Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/DevButton.tsx`.
 
@@ -61,12 +61,13 @@ Chat tab  ── POST /api/chat ──────────► lib/ai/chat.ts
                                               ▼
                                          lib/ai/tools.ts ──► lib/data (real numbers)
                                               │
-          ◄── { text, charts[] } ─────────────┘
+          ◄── { text, charts[], whatIf? } ────┘
 Week tab  ── GET /api/week ───────────► lib/data → getWeekSummary()   (no AI)
 Home loan ── GET /api/mortgage ───────► lib/data/mortgage.ts → getMortgageSummary()   (no AI)
+What-if   ── GET /api/what-if ────────► lib/insights/whatIfForecast.ts   (toggle + category buttons, no AI)
 ```
 
-1. User asks *"How much did I spend on taxis last month?"*
+1. User asks _"How much did I spend on taxis last month?"_
 2. `/api/chat` sends the conversation + the list of tools to the LLM.
 3. The LLM calls a tool, e.g. `spend_by_category({ period: "last_month", category: "taxi" })`.
 4. Our code in `lib/data` computes the **exact** number and returns it.
@@ -82,12 +83,12 @@ The data and the API key never leave the server.
 
 Each person works mostly in their own folder → fewer merge conflicts.
 
-| Area | Folder | First tasks |
-|---|---|---|
-| **Data** | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → basket table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
-| **AI** | `lib/ai/` | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`) |
-| **UI** | `app/`, `components/` | Chat look & feel, chart cards, Week tab. Theme colors in `app/globals.css` |
-| **Insights** | `lib/insights/` | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md` |
+| Area         | Folder                  | First tasks                                                                                                                     |
+| ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Data**     | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → basket table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
+| **AI**       | `lib/ai/`               | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`)                              |
+| **UI**       | `app/`, `components/`   | Chat look & feel, chart cards, Week tab. Theme colors in `app/globals.css`                                                      |
+| **Insights** | `lib/insights/`         | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md`                                    |
 
 **`lib/types.ts` is the shared contract.** Changing it affects everyone → tell the team first.
 
@@ -125,11 +126,13 @@ in `lib/data/index.ts`.
 ## AI setup
 
 In `.env.local`:
+
 ```
 LLM_BASE_URL=https://....modal.run/v1   # any "chat completions" endpoint (Modal, Gemini, Claude…)
 LLM_API_KEY=...
 LLM_MODEL=...
 ```
+
 Restart `npm run dev`. The "mock AI" badge disappears when the real model is used.
 Set `AI_MODE=mock` to switch back without deleting your settings.
 
@@ -175,25 +178,25 @@ Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the 
 
 ## Useful commands
 
-| Make | What it does |
-|---|---|
-| `make` | Run the app (installs packages only when they are missing or changed) |
+| Make         | What it does                                                          |
+| ------------ | --------------------------------------------------------------------- |
+| `make`       | Run the app (installs packages only when they are missing or changed) |
 | `make phone` | Same, reachable from a phone on the same wifi |
-| `make check` | Typecheck + lint — run before pushing |
-| `make data` | Raw CSVs in `data/raw/` → `data/demo/` |
+| `make check` | Typecheck + lint — run before pushing         |
+| `make data`  | Raw CSVs in `data/raw/` → `data/demo/`        |
 
 The npm scripts underneath:
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Run the app locally with live reload |
-| `npm run typecheck` | Check types across the whole project |
-| `npm run lint` | Check code style |
-| `npm run build` | Production build (what Vercel runs) |
-| `npm run mock-data` | Regenerate the fake `MOCK` customer |
-| `npm run prepare-data` | Raw CSV → small demo customer files |
-| `npm run benchmarks` | Raw CSV → `data/benchmarks.json` (averages from all customers, by age group) |
-| `npm run diagnose` | Test the AI connection from Node, outside the app |
+| Command                | What it does                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `npm run dev`          | Run the app locally with live reload                                         |
+| `npm run typecheck`    | Check types across the whole project                                         |
+| `npm run lint`         | Check code style                                                             |
+| `npm run build`        | Production build (what Vercel runs)                                          |
+| `npm run mock-data`    | Regenerate the fake `MOCK` customer                                          |
+| `npm run prepare-data` | Raw CSV → small demo customer files                                          |
+| `npm run benchmarks`   | Raw CSV → `data/benchmarks.json` (averages from all customers, by age group) |
+| `npm run diagnose`     | Test the AI connection from Node, outside the app                            |
 
 ## Conventions
 

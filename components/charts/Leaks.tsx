@@ -29,6 +29,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ChartSpec, LeaksView } from "@/lib/types";
 import { CategoryTile } from "./categoryIcons";
+import { CountUp } from "@/components/ui/CountUp";
 
 const EVERYDAY = "var(--basket-everyday)";
 const GOLD_TEXT = "#a16207"; // readable gold for text on white
@@ -36,51 +37,6 @@ const eur0 = (n: number) =>
   n.toLocaleString("fi-FI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 const eur = (n: number) => n.toLocaleString("fi-FI", { style: "currency", currency: "EUR" });
 const shortDays = (d: [string, string]) => d.map((x) => x.slice(0, 3)).join(" & ");
-
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/**
- * A number that counts to `value` (from 0 the first time, then from its last
- * value — so skipping a habit "rolls" the number down).
- */
-function CountUp({
-  value,
-  format,
-  duration = 900,
-  delay = 0,
-}: {
-  value: number;
-  format: (n: number) => string;
-  duration?: number;
-  delay?: number;
-}) {
-  const [shown, setShown] = useState(0);
-  const current = useRef(0);
-  const first = useRef(true);
-  useEffect(() => {
-    const start = current.current;
-    const ms = prefersReducedMotion() ? 0 : duration;
-    const wait = first.current ? delay : 0;
-    first.current = false;
-    let raf = 0;
-    let t0: number | null = null;
-    const step = (t: number) => {
-      if (t0 === null) t0 = t;
-      const p = ms === 0 ? 1 : Math.min(1, (t - t0) / ms);
-      const eased = 1 - Math.pow(1 - p, 3); // fast, then gently settles
-      current.current = start + (value - start) * eased;
-      setShown(current.current);
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    const timer = setTimeout(() => (raf = requestAnimationFrame(step)), wait);
-    return () => {
-      clearTimeout(timer);
-      cancelAnimationFrame(raf);
-    };
-  }, [value, duration, delay]);
-  return <>{format(shown)}</>;
-}
 
 export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
   const v = spec.leaks;

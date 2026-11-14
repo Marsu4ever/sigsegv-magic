@@ -3,6 +3,8 @@ import type { ChatMessage } from "@/lib/types";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { MoneyText } from "./MoneyText";
 
+// WHY no "show chart" link on what-if replies: the what-if panel stays above the chat,
+// so the user can just scroll up to it.
 export function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
   // WHY full width with charts: charts and the calendar need the room on a phone.

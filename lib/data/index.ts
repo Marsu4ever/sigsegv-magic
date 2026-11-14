@@ -31,6 +31,7 @@ export {
   getDatasetCategories,
 } from "./load";
 export { PERIODS, type Period } from "./dates";
+export { addDays, addMonths, daysInRange } from "./dates";
 export { allMerchantTypes, merchantType } from "./merchantTypes";
 
 // ─── Basics ──────────────────────────────────────────────────────────────
@@ -82,7 +83,8 @@ export function getDataToday(): string {
   return txs.length ? txs[txs.length - 1].date : new Date().toISOString().slice(0, 10);
 }
 
-function getDataFirstDay(): string {
+/** The date of the customer's first transaction of any kind ("YYYY-MM-DD"). */
+export function getDataFirstDay(): string {
   const txs = loadCustomerData().transactions;
   return txs.length ? txs[0].date : getDataToday();
 }

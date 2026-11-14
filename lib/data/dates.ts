@@ -96,3 +96,22 @@ export function resolvePeriod(period: Period, today: string, firstDate: string):
       return { from: firstDate, to: today };
   }
 }
+
+/**
+ * Same day n months later (n may be negative), clamped to the month's last day.
+ * WHY clamp: 31 Jan + 1 month must be 28/29 Feb, not 3 Mar (what Date would do).
+ */
+export function addMonths(s: string, n: number): string {
+  const [y, m, d] = s.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + n, 1));
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return toIso(target);
+}
+
+/** Number of days in a range, both ends included ("2026-01-01".."2026-01-01" = 1). */
+export function daysInRange(r: DateRange): number {
+  return Math.round((toDate(r.to).getTime() - toDate(r.from).getTime()) / 86_400_000) + 1;
+}
