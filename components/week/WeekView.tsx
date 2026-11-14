@@ -31,10 +31,9 @@ import type { Basket, WeekSummary } from "@/lib/types";
 import { BASKETS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
-import Link from "next/link";
 import { DevHeaderButton } from "@/components/DevButton";
 import { CountUp } from "@/components/ui/CountUp";
-import { Icon } from "@/components/ui/Icon";
+import { BackButton } from "@/components/ui/BackButton";
 import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 import { GoalSection } from "@/components/goal/GoalSection";
 
@@ -88,11 +87,9 @@ export function WeekView() {
           7-day numbers below get their own label with the dates. On phones the 🛠 team-hub link
           sits here (components/DevButton.tsx). */}
       <header className="flex items-center justify-between gap-4 border-b border-line bg-surface px-4 py-3">
-        {/* WHY a back arrow: this page is now opened from Home's spending breakdown (no own tab). */}
+        {/* WHY a back button: this page is opened from Home's spending breakdown (no own tab). */}
         <h1 className="flex items-center gap-1 font-semibold">
-          <Link href="/home" aria-label="Back to Home" className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-muted">
-            <Icon name="chevron" size={20} className="rotate-180" />
-          </Link>
+          <BackButton fallback="/home" />
           This week
         </h1>
         <DevHeaderButton />

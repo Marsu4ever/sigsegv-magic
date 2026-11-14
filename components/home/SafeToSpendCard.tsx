@@ -272,6 +272,7 @@ export function SafeToSpendCard({ s, weekSpentEur }: { s: SafeToSpendSummary; we
             items={s.fixedCosts}
             max={s.fixedCosts.length}
             empty="No regular bills or savings found before payday."
+            nested
           />
           {s.fixedCosts.length > 0 && (
             <div className="mt-2 flex justify-between px-4 text-sm font-semibold">

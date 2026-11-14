@@ -19,9 +19,9 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // WHY a portal to <body>: an ancestor with a transform (e.g. a chat reply's fade-in)
-  // turns "fixed" into "fixed to that ancestor", so the full screen was only as big as the
-  // reply: half hidden, jumping back up when scrolled (14 Nov). At <body> nothing can trap it.
+  // WHY a portal to <body>: chat bubbles animate in (msg-in), and an element with a
+  // transform/opacity animation traps `position: fixed` children inside itself and
+  // lets later bubbles paint on top. Rendering here keeps this truly full screen.
   return createPortal(
     <div className="fixed inset-0 z-50 flex justify-center bg-black/40" onClick={onClose}>
       <div
@@ -31,14 +31,8 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
         className="flex h-dvh w-full max-w-md flex-col bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center gap-2 border-b border-line px-3 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-full border border-line px-2.5 py-1 text-xs text-accent"
-          >
-            ← Back
-          </button>
+        {/* WHY only an X (no "← Back"): both did the same thing; matches BottomSheet. */}
+        <header className="flex items-center gap-2 border-b border-line py-3 pl-4 pr-2">
           <h2 className="min-w-0 flex-1 truncate font-semibold">
             <ChartTitle spec={spec} />
           </h2>
