@@ -70,7 +70,7 @@ export type DateRange = { from: string; to: string };
  * "cumulative" = month so far: running total per day of month, with a
  * projection to month end and last month as a dashed line (month_progress).
  */
-export type ChartType = "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative";
+export type ChartType = "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative" | "baskets";
 
 /**
  * One row of a chart. `value2` is optional: when set, the chart compares two
@@ -108,6 +108,29 @@ export type ChartSpec = {
    * ‹ › arrows can go. Months are "YYYY-MM". Other months: GET /api/month-progress.
    */
   monthNav?: { shown: string; first: string; last: string };
+  /** "baskets" charts: baskets → categories → merchant types, biggest first. */
+  baskets?: BasketGroup[];
+  /** Human-readable period the chart covers, e.g. "1.9.–29.9.2026". */
+  periodLabel?: string;
+};
+
+/** One basket with its categories and what's inside them (see basketTree.ts). */
+export type BasketGroup = {
+  basket: Basket;
+  label: string;
+  total: number;
+  categories: {
+    name: string;
+    total: number;
+    count: number;
+    merchants: {
+      name: string;
+      total: number;
+      count: number;
+      /** Each purchase, oldest first ("YYYY-MM-DD", euros). */
+      purchases: { date: string; amount: number }[];
+    }[];
+  }[];
 };
 
 // ─── Chat ────────────────────────────────────────────────────────────────

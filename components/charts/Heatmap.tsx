@@ -94,7 +94,6 @@ function MonthGrid({
   onSelect,
   onHover,
   showAmounts,
-  afterWeek,
 }: {
   month: string; // "YYYY-MM"
   byDate: Map<string, number>;
@@ -104,8 +103,6 @@ function MonthGrid({
   onSelect?: (date: string) => void;
   onHover?: (date: string | null, cell: HTMLElement | null) => void;
   showAmounts?: boolean; // euros inside each day (full screen only — too small in chat)
-  /** Something to show right under a week's row (the clicked day's list). */
-  afterWeek?: (monday: string) => React.ReactNode;
 }) {
   const first = `${month}-01`;
   const last = lastDayOfMonth(month);
@@ -195,7 +192,6 @@ function MonthGrid({
               );
             })}
           </div>
-          {afterWeek?.(monday)}
         </Fragment>
       ))}
     </div>
@@ -501,7 +497,7 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
       loadDay(date);
       setSelected(date);
       setHover(null);
-      // Bring the list (it opens under the clicked week) into view.
+      // Bring the list (below the calendar) into view.
       setTimeout(
         () =>
           details.current?.scrollIntoView({
@@ -559,11 +555,6 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
           selected={selected}
           onSelect={onSelect}
           onHover={onHover}
-          afterWeek={(monday) =>
-            selected && selected >= monday && selected <= addDays(monday, 6) ? (
-              <DayPanel panelRef={details} selected={selected} day={day} />
-            ) : null
-          }
         />
 
         {/* Hover popup: quick look at the day, biggest purchases first. */}
@@ -582,7 +573,11 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
         <Legend />
       </div>
 
-      {!selected && (
+      {/* WHY at the bottom (team decision): the calendar stays whole; the list
+          opens below everything and the page scrolls to it. */}
+      {selected ? (
+        <DayPanel panelRef={details} selected={selected} day={day} />
+      ) : (
         <p className="text-center text-sm text-muted">
           Hover a day for a quick look, tap it to see everything.
         </p>
@@ -592,8 +587,7 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
 }
 
 /**
- * The clicked day's purchases, biggest first — opens like a dropdown right
- * under the clicked week (WHY: next to the day, not at the bottom of the page).
+ * The clicked day's purchases, biggest first: 7 shown, "Show more" adds 7.
  */
 function DayPanel({
   panelRef,
@@ -607,7 +601,7 @@ function DayPanel({
   return (
     <div
       ref={panelRef}
-      className="my-1 scroll-mt-4 rounded-xl border border-line bg-surface p-3 shadow-sm"
+      className="scroll-mt-4 rounded-xl border border-line bg-surface p-3 shadow-sm"
     >
       {day && "error" in day && <p className="text-sm text-red-600">⚠️ {day.error}</p>}
       {!day && <p className="text-sm text-muted">Loading…</p>}

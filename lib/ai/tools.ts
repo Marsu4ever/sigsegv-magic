@@ -43,6 +43,7 @@ import { compareToPeers } from "@/lib/insights/benchmarks";
 import { everydayLeaks } from "@/lib/insights/leaks";
 import { irregularBuffer } from "@/lib/insights/irregular";
 import { monthProgress } from "@/lib/insights/monthProgress";
+import { basketTree } from "@/lib/insights/basketTree";
 import { recurringPayments } from "@/lib/insights/recurring";
 import { safeToSpend } from "@/lib/insights/safeToSpend";
 import { spenderProfile } from "@/lib/insights/spenderProfile";
@@ -59,6 +60,9 @@ type ToolOutput = Record<string, unknown> & {
   /** List shown under the chart (ChartSpec.items). Not sent to the LLM. */
   chartList?: ChartSpec["items"];
   monthNav?: ChartSpec["monthNav"];
+  /** Basket tree for the "baskets" chart (ChartSpec.baskets). */
+  basketTree?: ChartSpec["baskets"];
+  periodLabel?: string;
 };
 
 type Tool = {
@@ -147,6 +151,36 @@ const TOOLS: Tool[] = [
       const range = rangeFrom(a, "last_30_days");
       const totals = basketBreakdown(range);
       return { range, rows: BASKETS.map((b) => ({ label: BASKET_LABELS[b], value: totals[b] })) };
+    },
+  },
+  {
+    name: "basket_details",
+    description:
+      "The 3 baskets in a period, each split into categories, and each category into merchant types " +
+      "(e.g. Groceries → Supermarket, Convenience store), with euros and counts, biggest first. " +
+      "Use with show_chart chart_type 'baskets'.",
+    properties: { ...periodProps },
+    required: ["period"],
+    chartable: true,
+    run: (a) => {
+      const range = rangeFrom(a, "this_month");
+      const t = basketTree(range);
+      const d = (s: string) => `${Number(s.slice(8))}.${Number(s.slice(5, 7))}.`;
+      return {
+        range,
+        totalEur: t.total,
+        // WHY no single purchases for the AI: too long; the screen gets them (basketTree).
+        baskets: t.baskets.map((b) => ({
+          ...b,
+          categories: b.categories.map((c) => ({
+            ...c,
+            merchants: c.merchants.map(({ name, total, count }) => ({ name, total, count })),
+          })),
+        })),
+        rows: t.baskets.map((b) => ({ label: b.label, value: b.total })),
+        basketTree: t.baskets,
+        periodLabel: `${d(range.from)}–${d(range.to)}${range.to.slice(0, 4)}`,
+      };
     },
   },
   {
@@ -372,7 +406,7 @@ const TOOLS: Tool[] = [
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
-const CHART_TYPES = ["bar", "line", "pie", "table", "heatmap", "cumulative"] as const;
+const CHART_TYPES = ["bar", "line", "pie", "table", "heatmap", "cumulative", "baskets"] as const;
 const CHARTABLE = TOOLS.filter((t) => t.chartable).map((t) => t.name);
 
 /** Every argument any chartable tool accepts — show_chart's data_args schema. */
@@ -404,7 +438,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         "days and switch months). For 'heatmap' the server always uses daily spending — just pass period/from/to " +
         "and optionally category in data_args (data_tool can be spend_over_time). " +
         "'cumulative' = month so far vs last month with a projection to month end (data_tool month_progress, " +
-        "optional month 'YYYY-MM').",
+        "optional month 'YYYY-MM'). " +
+        "'baskets' = the 3 baskets with their categories; the user can tap a category to see what's inside " +
+        "(data_tool basket_details, period).",
       parameters: {
         type: "object",
         properties: {
@@ -439,8 +475,10 @@ const MAX_ROWS_FOR_LLM = 60;
 
 function forLlm(full: ToolOutput): string {
   // WHY drop chartList: it's for the screen; the LLM already gets the same data.
-  const { chartList: _unused, ...out } = full;
+  // basketTree is the same data as `baskets`, kept for the screen only.
+  const { chartList: _unused, basketTree: _sameAsBaskets, ...out } = full;
   void _unused;
+  void _sameAsBaskets;
   const rows = out.rows;
   if (!rows || rows.length <= MAX_ROWS_FOR_LLM) return JSON.stringify(out);
   const step = Math.ceil(rows.length / MAX_ROWS_FOR_LLM);
@@ -485,7 +523,9 @@ export function runTool(name: string, args: Args): ToolResult {
           })
         : type === "cumulative"
           ? BY_NAME.get("month_progress")!.run(dataArgs as Args)
-          : dataTool.run(dataArgs as Args);
+          : type === "baskets"
+            ? BY_NAME.get("basket_details")!.run(dataArgs as Args)
+            : dataTool.run(dataArgs as Args);
     const rows = out.rows ?? [];
     const chart: ChartSpec = {
       type,
@@ -496,6 +536,8 @@ export function runTool(name: string, args: Args): ToolResult {
       ...(out.facts ? { facts: out.facts } : {}),
       ...(out.chartList ? { items: out.chartList } : {}),
       ...(out.monthNav ? { monthNav: out.monthNav } : {}),
+      ...(out.basketTree ? { baskets: out.basketTree } : {}),
+      ...(out.periodLabel ? { periodLabel: out.periodLabel } : {}),
     };
     return { content: JSON.stringify({ shown: true, rows: rows.length }), chart };
   }

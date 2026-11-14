@@ -165,9 +165,18 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   }
 
   if (q.includes("basket")) {
-    const c = chart("pie", "This month by basket", "basket_breakdown", { period: "this_month" });
-    const total = (c?.rows ?? []).reduce((s, r) => s + r.value, 0);
-    return reply(`This month you've spent ${eur(total)} in total across your 3 baskets.`, c);
+    // WHY 90 days: one month often has only 2–3 categories; 3 months shows the real mix.
+    const c = chart("baskets", "Your 3 baskets (last 90 days)", "basket_details", {
+      period: "last_90_days",
+    });
+    const rows = c?.rows ?? [];
+    const total = rows.reduce((s, r) => s + r.value, 0);
+    return reply(
+      `In the last 90 days you've spent ${eur(total)}: ` +
+        rows.map((r) => `${eur(r.value)} ${r.label.toLowerCase()}`).join(", ") +
+        ". Tap a category to see what's inside it.",
+      c,
+    );
   }
 
   if (has(q, "trend", "over time")) {
