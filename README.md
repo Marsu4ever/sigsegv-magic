@@ -12,7 +12,7 @@ using the **3 baskets**: mandatory & regular, mandatory & irregular, and everyda
 Needs **Node.js 20.9 or newer** (`node -v`). With nvm: `nvm use` (the version is in `.nvmrc`).
 
 ```bash
-make            # installs packages, creates .env.local the first time, runs the app
+make            # runs the app (installs packages and creates .env.local only when needed)
 ```
 
 No `make` (e.g. Windows)? Same thing with npm:
@@ -177,7 +177,7 @@ Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the 
 
 | Make | What it does |
 |---|---|
-| `make` | Install + run the app |
+| `make` | Run the app (installs packages only when they are missing or changed) |
 | `make phone` | Same, reachable from a phone on the same wifi |
 | `make check` | Typecheck + lint — run before pushing |
 | `make data` | Raw CSVs in `data/raw/` → `data/demo/` |
