@@ -29,7 +29,7 @@ const BASKET_TEXT: Record<Basket, { name: string; meaning: string; color: string
     color: "var(--basket-regular)",
   },
   mandatory_irregular: {
-    name: "Irregular",
+    name: "Surprising expenses",
     meaning: "Needed, but surprise timing",
     color: "var(--basket-irregular)",
   },

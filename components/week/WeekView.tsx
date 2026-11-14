@@ -44,7 +44,7 @@ const TRACK = "color-mix(in srgb, var(--accent) 14%, var(--surface))";
 // heavy; Regular / Irregular / Everyday says the same on a phone.
 const TYPE_LABEL: Record<Basket, string> = {
   mandatory_regular: "Regular",
-  mandatory_irregular: "Irregular",
+  mandatory_irregular: "Surprising expenses",
   everyday: "Everyday",
 };
 

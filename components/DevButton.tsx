@@ -10,7 +10,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const SHOW_DEV_BUTTON = true;
+// Off for the demo (14 Nov); the team hub is still at /dev.
+const SHOW_DEV_BUTTON = false;
 
 // Shown highlighted on all team pages.
 const DEV_PATHS = ["/dev", "/data", "/customer_profiles"];

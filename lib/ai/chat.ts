@@ -21,14 +21,47 @@ import { getAiConfig } from "./config";
 import { chatCompletion, LlmError, type LlmMessage } from "./llm";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
-import { TOOL_DEFINITIONS, runTool } from "./tools";
+import { TOOL_DEFINITIONS, autoChartArgs, isChartable, runTool, usesMonthsRange } from "./tools";
 import { mockReply } from "./mock";
 import { noLongDashes } from "@/lib/noDashes";
 import { euroAfter } from "@/lib/euroAfter";
 import { moneyHealthNote } from "@/lib/insights/proactive";
 import { dropSentencesWith, euroAmounts, numbersIn, unsupportedAmounts } from "./amounts";
 
-const MAX_TOOL_ROUNDS = 6;
+const MAX_TOOL_ROUNDS = 7;
+
+/** The question points at the previous answer: "show IT over 12 months", "try AGAIN", "as a line". */
+const REFERS_BACK = /\b(it|that|this|same|again|those)\b|^\s*(as|in) a\b/i;
+
+/** The user asked to SEE something (a chart), not just for an answer. */
+// WHY no plain "show": the coach's own buttons say "Show me how I could save", which isn't
+// a chart request; it caused extra rounds and a "couldn't draw a chart" note.
+const WANTS_CHART = /\b(graph|chart|plot|visuali[sz]e|diagram|line|bars?|pie)\b/i;
+
+/** Data the server always draws if the model forgets show_chart: trends and the spender pie. */
+const ALWAYS_DRAW = new Set(["money_over_time", "spender_profile"]);
+
+/**
+ * "last 7 months", "past 12 months", "half a year" in the question → 7 / 12 / 6.
+ * WHY: the model sometimes turns "7 months" into last_7_days. The server reads the number
+ * from the user's own words and puts it in the tool arguments.
+ */
+function monthsAsked(question: string): number | null {
+  if (/\bhalf (a )?year\b|puoli vuotta/i.test(question)) return 6;
+  const m = question.match(/\b(\d{1,2})\s*(months?|mo\b|kk\b|kuukau)/i);
+  const n = m ? Number(m[1]) : NaN;
+  return n >= 1 && n <= 36 ? n : null;
+}
+
+/** Put the asked number of months into a tool's arguments, unless exact dates were given. */
+function withMonths(args: Record<string, unknown>, months: number | null): Record<string, unknown> {
+  if (!months || args.from || args.to || args.months === months) return args;
+  const { period: _p, ...rest } = args;
+  void _p;
+  return { ...rest, months };
+}
+
+
 /** Max time for ONE request to the LLM. */
 export const LLM_TIMEOUT_MS = 30_000;
 
@@ -70,9 +103,28 @@ function ms(start: number): string {
  * the chart the mock would show — same keywords, same real data, same tools —
  * so the app looks the same with or without the real AI. The AI's text stays.
  */
-function fallbackCharts(history: ChatMessage[]): ChartSpec[] {
+/** Only the app's special views; a plain bar/pie from keywords could show the wrong period. */
+const FALLBACK_TYPES = new Set(["baskets", "heatmap", "cumulative", "leaks"]);
+
+function fallbackCharts(
+  history: ChatMessage[],
+  fetched: { tool: string; args: Record<string, unknown> } | null = null,
+): ChartSpec[] {
   try {
-    const found = mockReply(history).charts ?? [];
+    const found = (mockReply(history).charts ?? [])
+      .filter((c) => FALLBACK_TYPES.has(c.type))
+      // WHY: the baskets chart said "90 days" while the AI's text said "last 30 days".
+      // Redraw it for the same period the AI looked at.
+      .map((c) => {
+        if (c.type !== "baskets" || !fetched || !/^basket_(breakdown|details)$/.test(fetched.tool)) return c;
+        const same = runTool("show_chart", {
+          chart_type: "baskets",
+          title: "Your 3 baskets",
+          data_tool: "basket_details",
+          data_args: fetched.args,
+        }).chart;
+        return same ?? c;
+      });
     if (found.length > 0) {
       console.log(
         `[ai] model drew no chart — added ${found.map((c) => c.type).join(", ")} (keyword fallback)`,
@@ -86,19 +138,31 @@ function fallbackCharts(history: ChatMessage[]): ChartSpec[] {
 }
 
 /**
+ * {measure: "income", months: 6} → "measure=income, months=6".
+ * WHY: lets "now over 12 months" / "as a line" redo the same chart with changed arguments.
+ * No brackets, so withoutOnScreenNotes() can still find the note's end.
+ */
+function argsText(args: Record<string, unknown>): string {
+  return Object.entries(args)
+    .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join("/") : String(v)}`)
+    .join(", ");
+}
+
+/**
  * One line telling the model what the user already sees under an earlier reply.
  * WHY: we send old replies as text only (charts would cost tokens), so the model didn't know
  * the leaks chart was already on screen and drew it again for every follow-up about a habit.
  */
 function onScreen(m: ChatMessage): string {
   const shown = [
-    ...(m.charts ?? []).map((c) => `${c.type} chart "${c.title}"`),
+    ...(m.charts ?? []).map(
+      (c) => `${c.type} chart "${c.title}"${c.source ? ` (made from ${c.source.tool}: ${argsText(c.source.args)})` : ""}`,
+    ),
     ...(m.whatIf ? [`what-if view: ${m.whatIf.target.label}, ${m.whatIf.cutPct}% less`] : []),
   ];
   return shown.length ? `\n[On screen: ${shown.join("; ")}]` : "";
 }
 
-/** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
 /**
  * "Couldn't get that number" sentences, from the app or copied by the model.
  * WHY strip them (from history AND replies): Qwen copies its own earlier replies, so one such
@@ -166,6 +230,7 @@ function withoutRepeatedOffer(text: string, history: ChatMessage[]): string {
   return sentences.join(" ").trim();
 }
 
+/** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
 function withoutOnScreenNotes(text: string): string {
   return text.replace(/\s*\[On screen:[^\]\n]*\]/g, "").trim();
 }
@@ -208,6 +273,17 @@ export async function runChat(history: ChatMessage[]): Promise<{
       content: m.role === "assistant" ? withoutCouldntGet(m.text) + onScreen(m) : m.text,
     })),
   ];
+  const question = history.at(-1)?.text ?? "";
+  // The chart under the latest earlier reply, and how it was made (for "show it over 12 months").
+  const prevSource = [...history]
+    .reverse()
+    .find((m) => m.role === "assistant" && m.charts?.some((c) => c.source))
+    ?.charts?.find((c) => c.source)?.source;
+  let redone = false;
+  const wantsChart = WANTS_CHART.test(question);
+  const askedMonths = monthsAsked(question);
+  // The last chartable data the model fetched this turn: drawn by the server if it forgets show_chart.
+  let lastChartable: { tool: string; args: Record<string, unknown> } | null = null;
 
   const charts: ChartSpec[] = [];
   let whatIfBars = false; // what_if draws its own bar chart; a show_chart of it would be a twin
@@ -257,6 +333,37 @@ export async function runChat(history: ChatMessage[]): Promise<{
 
     const toolCalls = (msg.tool_calls ?? []).filter((c) => c.type === "function");
 
+    // "Show it over 12 months" answered without any tool: re-run the previous chart's data with
+    // the new months and give the model those numbers. WHY: Qwen re-used (or made up) numbers
+    // from its own earlier text and called them 12 months (14 Nov). The server knows what "it" was.
+    if (
+      toolCalls.length === 0 &&
+      toolCallsThisTurn === 0 &&
+      REFERS_BACK.test(question) &&
+      prevSource &&
+      usesMonthsRange(prevSource.tool) &&
+      !redone &&
+      round < MAX_TOOL_ROUNDS
+    ) {
+      redone = true;
+      const args = withMonths(prevSource.args, askedMonths);
+      const id = "app-redo-1";
+      const redo = runTool(prevSource.tool, args);
+      console.log(`[ai] round ${round}: follow-up without a tool — re-ran ${prevSource.tool}(${JSON.stringify(args)})`);
+      lastChartable = { tool: prevSource.tool, args };
+      toolCallsThisTurn += 1;
+      knownNumbers.push(...numbersIn(redo.content));
+      messages.push(
+        {
+          role: "assistant",
+          content: null,
+          tool_calls: [{ id, type: "function", function: { name: prevSource.tool, arguments: JSON.stringify(args) } }],
+        },
+        { role: "tool", tool_call_id: id, content: redo.content },
+      );
+      continue;
+    }
+
     // Made-up numbers → ask once to redo the answer with tools:
     // a € amount that is in no tool result of this turn and nowhere earlier in the chat.
     // WHY not "any digit without a tool call" (removed): it fired on real numbers repeated from
@@ -288,6 +395,38 @@ export async function runChat(history: ChatMessage[]): Promise<{
 
     // No tool calls → the model has written its final answer.
     if (toolCalls.length === 0) {
+      // Fetched chartable data but didn't draw it, and the user wants a chart (or it's a trend
+      // over time) → the server draws exactly that data. No guessing, no extra LLM round.
+      if (
+        charts.length === 0 &&
+        !whatIf &&
+        lastChartable &&
+        (wantsChart || ALWAYS_DRAW.has(lastChartable.tool))
+      ) {
+        const auto = runTool("show_chart", {
+          ...autoChartArgs(lastChartable.tool, lastChartable.args),
+          data_tool: lastChartable.tool,
+          data_args: lastChartable.args,
+        });
+        // WHY ≥ 2 rows: one number ("salary in March") needs no chart.
+        if (auto.chart && auto.chart.rows.length >= 2) {
+          console.log(`[ai] model drew no chart — drew ${lastChartable.tool} itself (${auto.chart.title})`);
+          charts.push(auto.chart);
+        }
+      }
+      // Asked for a chart but no chartable data was fetched at all → ask once to fetch and draw it.
+      if (wantsChart && charts.length === 0 && !whatIf && !nudged && round < MAX_TOOL_ROUNDS) {
+        nudged = true;
+        console.warn(`[ai] round ${round}: chart asked for but none drawn — asking again`);
+        messages.push(msg, {
+          role: "user",
+          content:
+            "[App check, not from the user] The user asked to see a chart, but none was drawn. " +
+            "Fetch the data with the right tool (money_over_time covers income, spending, kept and " +
+            "balance for any number of months) and call show_chart. Never mention tools in your answer.",
+        });
+        continue;
+      }
       // Never send an empty reply: fall back to the answer from before the nudge.
       const empty = !(msg.content ?? "").trim();
       if (empty && firstAnswer) console.warn("[ai] retry came back empty — using the first answer");
@@ -315,15 +454,21 @@ export async function runChat(history: ChatMessage[]): Promise<{
         console.warn("[ai] warning: final answer is empty — sending a short fallback");
         text = "Sorry, I couldn't work that out from your data. Try asking in a different way.";
       }
+      // No chart from the model → safety net adds one, unless the what-if
+      // view opens (that panel already is the visual).
+      const shown = charts.length > 0 || whatIf ? charts : fallbackCharts(history, lastChartable);
+      // Asked for a chart and still none: say so instead of pretending.
+      const noChartNote =
+        wantsChart && shown.length === 0 && !whatIf
+          ? "\n\nI couldn't draw a chart for that. Try e.g. \"income vs spending last 6 months\"."
+          : "";
       return {
         reply: {
           role: "assistant",
           // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
           // sure (lib/noDashes.ts, lib/euroAfter.ts).
-          text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))),
-          // No chart from the model → safety net adds one, unless the what-if
-          // view opens (that panel already is the visual).
-          charts: charts.length > 0 || whatIf ? charts : fallbackCharts(history),
+          text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))) + noChartNote,
+          charts: shown,
           whatIf,
         },
         mode: "live",
@@ -347,6 +492,19 @@ export async function runChat(history: ChatMessage[]): Promise<{
           call.function.arguments,
         );
       }
+      // The user's own "N months" wins over what the model guessed.
+      if (askedMonths) {
+        if (
+          call.function.name === "show_chart" &&
+          usesMonthsRange(String(args.data_tool)) &&
+          args.data_args &&
+          typeof args.data_args === "object"
+        ) {
+          args = { ...args, data_args: withMonths(args.data_args as Record<string, unknown>, askedMonths) };
+        } else if (usesMonthsRange(call.function.name)) {
+          args = withMonths(args, askedMonths);
+        }
+      }
       let result;
       try {
         result = runTool(call.function.name, args);
@@ -363,6 +521,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
       console.log(
         `[ai]   ${call.function.name}(${JSON.stringify(args)}) → ${result.content.slice(0, 150)}`,
       );
+      if (isChartable(call.function.name)) lastChartable = { tool: call.function.name, args };
       if ("chart" in result && result.chart) {
         const isWhatIfBars =
           call.function.name === "what_if" ||
