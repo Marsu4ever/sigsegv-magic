@@ -24,7 +24,7 @@ const BASKET_SHORT: Record<Basket, string> = {
 };
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
-const eur = (n: number) => `€${n.toLocaleString("fi-FI")}`;
+const eur = (n: number) => `${n.toLocaleString("fi-FI")} €`;
 
 function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
   return (

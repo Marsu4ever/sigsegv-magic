@@ -12,8 +12,7 @@ import {
   periodToRange,
 } from "./index";
 import { balanceOverTime, incomeSummary } from "./money";
-
-const PAGE_SIZE = 30;
+import { endOfMonth } from "./dates";
 
 /** "05OCT24:17:51:20" (the dataset's timestamp) → "17:51". */
 function timeOf(timestamp: string): string {
@@ -31,18 +30,21 @@ function toRow(t: Transaction): AccountTransaction {
   };
 }
 
-/** Everything the Account tab shows. `offset` pages through the transactions (newest first). */
-export function getAccountSummary(offset = 0): AccountSummary {
+/** Everything the Account tab shows. `month` ("YYYY-MM") picks the transaction list's month. */
+export function getAccountSummary(month?: string): AccountSummary {
   const txs = getTransactions(); // oldest first
   const latest = txs.at(-1);
   const thisMonth = incomeSummary(periodToRange("this_month"));
   const history = balanceOverTime(periodToRange("last_90_days"));
-  const start = Math.max(0, Math.floor(offset));
-  const page = txs
-    .slice()
-    .reverse()
-    .slice(start, start + PAGE_SIZE)
-    .map(toRow);
+
+  // WHY whole months with ‹ › arrows (not endless "Show more"): easy to go back and
+  // forth, and each month has its own total — simpler to follow on a phone.
+  const first = txs[0]?.date.slice(0, 7) ?? getDataToday().slice(0, 7);
+  const last = latest?.date.slice(0, 7) ?? first;
+  const shown = month && /^\d{4}-\d{2}$/.test(month) && month >= first && month <= last ? month : last;
+  const range = { from: `${shown}-01`, to: endOfMonth(`${shown}-01`) };
+  const inOut = incomeSummary(range);
+
   return {
     accountId: latest?.accountId ?? "",
     balanceEur: latest?.balanceAfterEur ?? 0,
@@ -54,7 +56,7 @@ export function getAccountSummary(offset = 0): AccountSummary {
     },
     balanceHistory: history.rows,
     lowest: history.lowest,
-    transactions: page,
-    nextOffset: start + PAGE_SIZE < txs.length ? start + PAGE_SIZE : null,
+    list: { month: shown, first, last, incomeEur: inOut.incomeEur, spendingEur: inOut.spendingEur },
+    transactions: getTransactions(range).slice().reverse().map(toRow),
   };
 }

@@ -320,6 +320,11 @@ export type Insight = {
   id: string; // stable per rule, e.g. "spending-alert"
   kind: InsightKind;
   title: string; // "Your grocery spending increased"
+  /**
+   * One short line to catch the eye before any detail, e.g. "You could save {+618 €} a year".
+   * The Account tab shows only this until the card is tapped.
+   */
+  hook: string;
   /** What was noticed. Amounts use the money markers {+…} / {-…} (components/chat/MoneyText). */
   detail: string;
   /** Why it was noticed: the comparison behind it, in plain words. */
@@ -351,7 +356,7 @@ export type AccountTransaction = {
   kind: "spending" | "income" | "savings_move";
 };
 
-/** GET /api/account?offset=N response body. */
+/** GET /api/account?month=YYYY-MM response body. */
 export type AccountSummary = {
   accountId: string;
   balanceEur: number; // after the latest transaction
@@ -359,8 +364,12 @@ export type AccountSummary = {
   month: { range: DateRange; incomeEur: number; spendingEur: number };
   balanceHistory: ChartRow[]; // end-of-day balance, last 90 days
   lowest: { date: string; balanceEur: number } | null; // lowest point in balanceHistory
-  transactions: AccountTransaction[]; // newest first, one page
-  nextOffset: number | null; // for "Show more"; null when everything is shown
+  /**
+   * The month shown in the transaction list ("YYYY-MM"), how far the ‹ › arrows can go,
+   * and that month's money in / out. Changed 15 Nov: was offset paging ("Show more").
+   */
+  list: { month: string; first: string; last: string; incomeEur: number; spendingEur: number };
+  transactions: AccountTransaction[]; // that month, newest first
 };
 
 /** GET /api/week response body. */
