@@ -135,6 +135,14 @@ Set `AI_MODE=mock` to switch back without deleting your settings.
 
 ⚠️ The model must support **tool calling** (function calling). Test this first.
 
+**Our Modal server** (`ai-server/qwen_vllm.py`, Qwen3.6-35B-A3B on 1× H100, always on):
+```bash
+modal deploy ai-server/qwen_vllm.py   # deploy / update
+modal app stop money-coach-llm        # stop the GPU bill
+modal app logs money-coach-llm        # server logs
+```
+Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the AI person.
+
 ---
 
 ## Git workflow (4 people, one repo)

@@ -41,7 +41,7 @@ import {
   largestTransactions,
   transactionRows,
 } from "@/lib/data/money";
-import { compareToPeers } from "@/lib/insights/benchmarks";
+import { compareToPeers, getBenchmarks } from "@/lib/insights/benchmarks";
 import { everydayLeaks } from "@/lib/insights/leaks";
 import { irregularBuffer } from "@/lib/insights/irregular";
 import { monthProgress } from "@/lib/insights/monthProgress";
@@ -322,8 +322,33 @@ const TOOLS: Tool[] = [
     run: () => {
       const c = compareToPeers();
       if (!c) return { error: "No benchmarks file (run npm run benchmarks)." };
+      // WHY difference + verdict computed here: the model subtracted badly and
+      // called €89 vs €96 "more". The typical range (p25–p75) decides the verdict.
+      const byCategory = c.rows.map((r) => ({
+        category: r.category,
+        differenceVsTypicalEur: Math.round((r.youPerMonth - r.peersMedian) * 100) / 100,
+        verdict:
+          r.youPerMonth > r.peersTypicalRange[1]
+            ? "above typical range"
+            : r.youPerMonth < r.peersTypicalRange[0]
+              ? "below typical range"
+              : "within typical range",
+      }));
+      // WHY a total: "do I spend more than people my age?" is about the whole
+      // month, and without it the model added up the categories itself.
+      const youTotal = Math.round(c.rows.reduce((sum, r) => sum + r.youPerMonth, 0) * 100) / 100;
+      const peersTotal = getBenchmarks()?.groups[c.ageGroup]?.totalSpendingPerMonth;
       return {
         ...c,
+        total: {
+          youPerMonthEur: youTotal,
+          peersMedianEur: peersTotal?.median,
+          peersTypicalRangeEur: peersTotal ? [peersTotal.p25, peersTotal.p75] : undefined,
+          differenceVsTypicalEur: peersTotal
+            ? Math.round((youTotal - peersTotal.median) * 100) / 100
+            : undefined,
+        },
+        byCategory,
         rows: c.rows.map((r) => ({
           label: r.category,
           value: r.youPerMonth,
@@ -538,7 +563,13 @@ function forLlm(full: ToolOutput): string {
   void _unused;
   void _sameAsBaskets;
   void _screenOnly;
-  const rows = out.rows;
+  // WHY rename value/value2 to the series names ("You" / "Typical age 26-35"):
+  // with bare value/value2 the model mixed up which number was whose.
+  const names = out.seriesNames;
+  const rows = names
+    ? out.rows?.map(({ value, value2, ...rest }) => ({ ...rest, [names[0]]: value, [names[1]]: value2 }))
+    : out.rows;
+  if (rows) out.rows = rows as ChartRow[];
   if (!rows || rows.length <= MAX_ROWS_FOR_LLM) return JSON.stringify(out);
   const step = Math.ceil(rows.length / MAX_ROWS_FOR_LLM);
   return JSON.stringify({
