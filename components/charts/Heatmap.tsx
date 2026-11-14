@@ -14,6 +14,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Basket, ChartRow, ChartSpec, DaySpending } from "@/lib/types";
 import { BASKET_LABELS } from "@/lib/types";
+import { Icon } from "@/components/ui/Icon";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -38,6 +39,9 @@ const BASKET_DOT: Record<Basket, string> = {
   mandatory_irregular: "var(--basket-irregular)",
   everyday: "var(--basket-everyday)",
 };
+
+// How many of the month's biggest days get the shine (a hint that days are tappable).
+const TOP_SHINE = 3;
 
 // Fits in a calendar cell: "84 €", "613 €", "1,2k €". WHY whole euros: cents don't fit.
 const shortEur = (n: number) =>
@@ -110,6 +114,12 @@ function MonthGrid({
   const weeks: string[] = [];
   for (let w = mondayOf(first); w <= last; w = addDays(w, 7)) weeks.push(w);
   const gap = Math.max(2, Math.round(cell / 9));
+  // The month's biggest spending days, biggest first → they shine (see .day-shine).
+  const topDays = [...byDate]
+    .filter(([d, v]) => d.startsWith(month) && v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_SHINE)
+    .map(([d]) => d);
 
   // WHY weekdays across the top (team decision): reads like a normal calendar —
   // Mon…Sun left to right, one row per week.
@@ -135,6 +145,7 @@ function MonthGrid({
               const v = byDate.get(date);
               const hasData = v !== undefined;
               const isSel = date === selected;
+              const rank = topDays.indexOf(date); // -1 = not a top day
               // WHY a <div> when not clickable: the preview sits inside the chat
               // card's <button>, and a button inside a button is invalid HTML.
               const Cell = onSelect ? "button" : "div";
@@ -156,8 +167,16 @@ function MonthGrid({
                   }
                   onPointerLeave={() => onHover?.(null, null)}
                   title={onHover ? undefined : hasData ? `${date}: ${eur(v!)}` : `${date}: no data`}
-                  className="relative flex items-center justify-center rounded"
+                  className={`relative flex items-center justify-center rounded ${
+                    onSelect && hasData
+                      ? "cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                      : ""
+                  } ${rank >= 0 ? "day-shine" : ""}`}
                   style={{
+                    // WHY staggered: three cells flashing in sync looks like a glitch.
+                    ...(rank >= 0
+                      ? ({ "--shine-delay": `${rank * 0.35}s` } as React.CSSProperties)
+                      : {}),
                     width: cell,
                     height: cell,
                     background: hasData ? LEVEL_COLORS[level(v!)] : "transparent",
@@ -178,7 +197,7 @@ function MonthGrid({
                         <span
                           className="font-semibold tabular-nums"
                           style={{
-                            fontSize: Math.min(14, cell / 4.2),
+                            fontSize: Math.min(16, cell / 3.8),
                             color: level(v!) >= 3 ? "var(--accent-foreground)" : "var(--foreground)",
                           }}
                         >
@@ -245,22 +264,102 @@ function DayBars({ day, limit }: { day: DaySpending; limit?: number }) {
 }
 
 const HOVER_TOP = 7; // purchases shown in the hover popup
-const LIST_STEP = 7; // purchases per "page" in the click list
+const LIST_STEP = 7; // categories per "page" in the click list
 
-/** Full list after a click: 7 purchases, "Show more" opens 7 more below. */
+/** Full list after a click: 7 categories, "Show more" opens 7 more below. Tap one for its payments. */
 function DayList({ day }: { day: DaySpending }) {
   const [shown, setShown] = useState(LIST_STEP);
-  const left = day.transactions.length - shown;
+  const [open, setOpen] = useState<string | null>(null); // category whose payments are shown
+  // WHY grouped: the data has no receipt lines, so "what did I buy" = the
+  // category's payments. One row per category, biggest total first; tap it
+  // to see each payment's time and store type.
+  // WHY no Map.groupBy / toSorted: they crash on iPhones older than iOS 17.4.
+  const byCategory = new Map<string, DaySpending["transactions"]>();
+  for (const t of day.transactions) {
+    byCategory.set(t.category, [...(byCategory.get(t.category) ?? []), t]);
+  }
+  const groups = [...byCategory]
+    .map(([category, txs]) => ({
+      category,
+      txs: [...txs].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+      total: txs.reduce((s, t) => s + t.amountEur, 0),
+      basket: txs[0].basket,
+    }))
+    .sort((a, b) => b.total - a.total);
+  const max = groups[0]?.total || 1;
+  const left = groups.length - shown;
   return (
     <>
-      <DayBars day={day} limit={shown} />
+      <ul className="space-y-1 text-sm">
+        {groups.slice(0, shown).map((g) => {
+          const isOpen = open === g.category;
+          return (
+            <li key={g.category}>
+              <button
+                type="button"
+                onClick={() => setOpen(isOpen ? null : g.category)}
+                aria-expanded={isOpen}
+                className="relative w-full overflow-hidden rounded-md px-2 py-1.5 text-left transition-colors hover:bg-line/40"
+              >
+                <span
+                  className="absolute inset-y-0 left-0 rounded-md opacity-25"
+                  style={{
+                    width: `${Math.max(4, (g.total / max) * 100)}%`,
+                    background: BASKET_DOT[g.basket],
+                  }}
+                />
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ background: BASKET_DOT[g.basket] }}
+                      title={BASKET_LABELS[g.basket]}
+                    />
+                    <span className="truncate">{g.category}</span>
+                    {g.txs.length > 1 && (
+                      <span className="shrink-0 rounded-full bg-background px-1.5 text-[11px] text-muted tabular-nums">
+                        ×{g.txs.length}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 font-medium tabular-nums">
+                    {eur(g.total)}
+                    <Icon
+                      name="chevron"
+                      size={14}
+                      className={`text-muted transition-transform ${isOpen ? "rotate-90" : ""}`}
+                    />
+                  </span>
+                </span>
+              </button>
+              {isOpen && (
+                // Each payment in this category, in time order.
+                <ul className="fade-up mt-1 mb-2 ml-3.5 space-y-0.5 border-l-2 border-line pl-3">
+                  {g.txs.map((t, i) => (
+                    <li key={i} className="flex items-center justify-between gap-2 py-0.5">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="w-10 shrink-0 text-xs text-muted tabular-nums">
+                          {t.time ?? "–"}
+                        </span>
+                        <span className="truncate">{t.merchantType ?? "Payment"}</span>
+                      </span>
+                      <span className="shrink-0 tabular-nums">{eur(t.amountEur)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
       {(left > 0 || shown > LIST_STEP) && (
         <button
           type="button"
           onClick={() => setShown(left > 0 ? shown + LIST_STEP : LIST_STEP)}
-          className="mt-2 w-full rounded-lg border border-line py-1.5 text-sm text-accent"
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-sm text-accent"
         >
-          {left > 0 ? `Show more (${left} left)` : "Show less"}
+          <Icon name="chevron" size={14} className={left > 0 ? "rotate-90" : "-rotate-90"} />
+          {left > 0 ? `${left} more` : "Less"}
         </button>
       )}
     </>
@@ -525,24 +624,30 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
           type="button"
           onClick={() => setMonth(shiftMonth(month, -1))}
           disabled={month <= firstMonth}
-          className="rounded-full border border-line px-3 py-1 text-lg disabled:opacity-30"
+          className="rounded-full border border-line p-2 disabled:opacity-30"
           aria-label="Previous month"
         >
-          ‹
+          <Icon name="chevron" size={18} className="rotate-180" />
         </button>
         <div className="text-center">
           <div className="font-semibold">{monthName(month)}</div>
           <MonthTotal value={monthTotal} big />
-          <div className="mt-0.5 text-xs text-muted">spending on {spendDays} days</div>
+          <div
+            className="mt-1 flex items-center justify-center gap-1 text-xs text-muted"
+            title="Days with spending"
+          >
+            <Icon name="calendar" size={12} />
+            {spendDays} days
+          </div>
         </div>
         <button
           type="button"
           onClick={() => setMonth(shiftMonth(month, 1))}
           disabled={month >= lastMonth}
-          className="rounded-full border border-line px-3 py-1 text-lg disabled:opacity-30"
+          className="rounded-full border border-line p-2 disabled:opacity-30"
           aria-label="Next month"
         >
-          ›
+          <Icon name="chevron" size={18} />
         </button>
       </div>
 
@@ -579,8 +684,13 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
       {selected ? (
         <DayPanel panelRef={details} selected={selected} day={day} />
       ) : (
-        <p className="text-center text-sm text-muted">
-          Hover a day for a quick look, tap it to see everything.
+        <p className="flex items-center justify-center gap-1.5 text-center text-sm text-muted">
+          <Icon name="tap" size={14} className="shrink-0" />
+          Tap a day for its purchases
+          <span className="text-accent">
+            <Icon name="sparkles" size={12} />
+          </span>
+          = biggest
         </p>
       )}
     </div>
@@ -588,7 +698,7 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
 }
 
 /**
- * The clicked day's purchases, biggest first: 7 shown, "Show more" adds 7.
+ * The clicked day's spending by category, biggest first: 7 shown, "Show more" adds 7.
  */
 function DayPanel({
   panelRef,
@@ -612,11 +722,15 @@ function DayPanel({
             <span className="font-semibold">{dayTitle(selected)}</span>
             <span className="font-semibold tabular-nums">{eur(day.totalEur)}</span>
           </div>
-          <p className="mb-2 text-xs text-muted">
-            {day.transactions.length} purchase{day.transactions.length === 1 ? "" : "s"}, biggest
-            first
+          <p className="mb-2 flex items-center gap-3 text-xs text-muted">
+            <span className="flex items-center gap-1" title="Purchases, biggest first">
+              <Icon name="bag" size={12} />
+              {day.transactions.length} purchase{day.transactions.length === 1 ? "" : "s"}
+            </span>
             {day.incomeEur > 0 && (
-              <span className="text-accent"> · + {eur(day.incomeEur)} income this day</span>
+              <span className="flex items-center gap-1 text-accent" title="Income this day">
+                <Icon name="trend" size={12} />+ {eur(day.incomeEur)}
+              </span>
             )}
           </p>
           {day.transactions.length === 0 ? (

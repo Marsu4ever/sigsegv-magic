@@ -304,6 +304,8 @@ export type DaySpending = {
     merchantType: string | null;
     amountEur: number; // positive = spent
     basket: Basket;
+    /** "HH:MM" when the payment was made, null if the timestamp can't be read. Added 14 Nov. */
+    time: string | null;
   }[];
 };
 

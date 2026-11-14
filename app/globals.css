@@ -289,3 +289,48 @@ body {
     animation: none;
   }
 }
+
+/* Spending calendar: a diagonal light sweep across the month's biggest days,
+   so people see that days can be tapped. --shine-delay staggers the cells. */
+@keyframes day-shine-sweep {
+  0% {
+    transform: translateX(-130%);
+  }
+  35%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+.day-shine {
+  overflow: hidden;
+}
+.day-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 75%
+  );
+  transform: translateX(-130%);
+  animation: day-shine-sweep 3.2s ease-in-out var(--shine-delay, 0s) infinite;
+}
+/* WHY dimmer in dark mode: full white looks like a glitch on dark greens. */
+:root[data-theme="dark"] .day-shine::after {
+  background: linear-gradient(
+    115deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 75%
+  );
+}
+@media (prefers-reduced-motion: reduce) {
+  .day-shine::after {
+    animation: none;
+    display: none;
+  }
+}
