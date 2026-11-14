@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import type { DemoCustomerOption, DemoCustomersResponse } from "@/lib/types";
 import { switchDemoCustomer } from "@/lib/demoCustomer";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { versionLabel } from "@/lib/version";
 
 const SHOW_CUSTOMER_SWITCHER = true;
 
@@ -142,6 +143,9 @@ function Sheet({ data, onClose }: { data: DemoCustomersResponse; onClose: () => 
             Back to the default ({data.defaultId})
           </button>
         )}
+
+        {/* Which build is live — handy on a phone right before the demo. */}
+        <p className="mt-4 text-center text-[11px] text-muted">{versionLabel()}</p>
       </div>
     </div>
   );

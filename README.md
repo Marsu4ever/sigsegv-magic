@@ -12,7 +12,7 @@ using the **3 baskets**: mandatory & regular, mandatory & irregular, and everyda
 Needs **Node.js 20.9 or newer** (`node -v`). With nvm: `nvm use` (the version is in `.nvmrc`).
 
 ```bash
-make            # runs the app (installs packages and creates .env.local only when needed)
+make dev        # runs the app (installs packages and creates .env.local only when needed)
 ```
 
 No `make` (e.g. Windows)? Same thing with npm:
@@ -180,7 +180,8 @@ Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the 
 
 | Make         | What it does                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `make`       | Run the app (installs packages only when they are missing or changed) |
+| `make`       | List these commands                           |
+| `make dev`   | Run the app (installs packages only when they are missing or changed) |
 | `make phone` | Same, reachable from a phone on the same wifi |
 | `make check` | Typecheck + lint — run before pushing         |
 | `make data`  | Raw CSVs in `data/raw/` → `data/demo/`        |
@@ -206,5 +207,8 @@ The npm scripts underneath:
 
 ## Deploy
 
-Push to GitHub → import the repo on [vercel.com](https://vercel.com) → add the `.env.local` values as
-environment variables. Every PR gets its own preview link.
+The demo site is on Vercel, deployed by hand with the Vercel CLI (`npx vercel --prod`).
+
+The Vercel project needs the `.env.local` values (`LLM_BASE_URL` ending in `/v1`, `LLM_API_KEY`,
+`LLM_MODEL`, optional `DEMO_CUSTOMER_ID`) as environment variables. Which build is live:
+`/api/health`, `/dev`, or the bottom of the DEMO customer list.

@@ -28,6 +28,7 @@ import type { Basket, WeekSummary } from "@/lib/types";
 import { BASKETS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
+import { DevHeaderButton } from "@/components/DevButton";
 
 const TYPE_COLOR: Record<Basket, string> = {
   mandatory_regular: "color-mix(in srgb, var(--accent) 62%, black)", // deep green
@@ -74,14 +75,18 @@ export function WeekView() {
 
   return (
     <div className="h-full overflow-y-auto" onClick={focus ? clearOnOutsideTap : undefined}>
-      {/* Title on the left, dates on the right, same size (team call: far apart). */}
+      {/* Title on the left, dates on the right, same size (team call: far apart).
+          On phones the 🛠 team-hub link sits after the dates (components/DevButton.tsx). */}
       <header className="flex items-baseline justify-between gap-4 border-b border-line bg-surface px-4 py-3">
         <h1 className="font-semibold">Last 7 days</h1>
-        {data && (
-          <span className="text-muted tabular-nums">
-            {fiDate(data.range.from)} – {fiDate(data.range.to)}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {data && (
+            <span className="text-muted tabular-nums">
+              {fiDate(data.range.from)} – {fiDate(data.range.to)}
+            </span>
+          )}
+          <DevHeaderButton />
+        </div>
       </header>
 
       <div className="space-y-3 p-4">

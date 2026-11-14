@@ -17,6 +17,7 @@ import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
+import { DevHeaderButton } from "@/components/DevButton";
 
 /**
  * WHY a client-side limit too: even if the server never answers (crash,
@@ -88,6 +89,8 @@ export function ChatView() {
   const [whatIfKey, setWhatIfKey] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const [whatIfChip, setWhatIfChip] = useState<string | null>(null);
+  // The lightbulb next to the text box: suggested questions again, mid-conversation.
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
   // On failure the chip is just left out — the other suggestions still work.
@@ -104,6 +107,12 @@ export function ChatView() {
   const suggestions = whatIfChip
     ? [...SUGGESTIONS.slice(0, WHAT_IF_CHIP_AT), whatIfChip, ...SUGGESTIONS.slice(WHAT_IF_CHIP_AT)]
     : SUGGESTIONS;
+
+  // WHY leave out what was already asked: the lightbulb should offer what the user
+  // hasn't explored yet. If they've asked everything, show the full list again.
+  const asked = new Set(messages.filter((m) => m.role === "user").map((m) => m.text));
+  const notAskedYet = suggestions.filter((s) => !asked.has(s));
+  const moreSuggestions = notAskedYet.length ? notAskedYet : suggestions;
 
   // Count seconds while waiting, so a slow answer is visibly "still working".
   useEffect(() => {
@@ -173,6 +182,7 @@ export function ChatView() {
   }, []);
 
   async function send(text: string) {
+    setSuggestionsOpen(false);
     const next: ChatMessage[] = [...messages, { role: "user", text }];
     setMessages(next);
     setLoading(true);
@@ -242,11 +252,14 @@ export function ChatView() {
           <LogoMark size={26} />
           Money Coach
         </h1>
-        {mode === "mock" && (
-          <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
-            mock AI
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {mode === "mock" && (
+            <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
+              mock AI
+            </span>
+          )}
+          <DevHeaderButton />
+        </div>
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
@@ -301,7 +314,33 @@ export function ChatView() {
         <div ref={bottomRef} />
       </div>
 
-      <ChatInput onSend={send} disabled={loading} />
+      {/* Suggested questions again, without starting a new chat (lightbulb in ChatInput). */}
+      {suggestionsOpen && messages.length > 0 && (
+        <div
+          className="flex gap-2 overflow-x-auto border-t border-line bg-surface px-2 py-2"
+          aria-label="Suggested questions"
+        >
+          {moreSuggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              disabled={loading}
+              onClick={() => send(s)}
+              className="shrink-0 whitespace-nowrap rounded-full border border-line bg-background px-3 py-1.5 text-sm disabled:opacity-40"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <ChatInput
+        onSend={send}
+        disabled={loading}
+        // WHY only after the first message: before that, the suggestions are on screen already.
+        onToggleSuggestions={messages.length > 0 ? () => setSuggestionsOpen((o) => !o) : undefined}
+        suggestionsOpen={suggestionsOpen}
+      />
     </div>
   );
 }
