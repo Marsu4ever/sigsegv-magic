@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { requestChatReset } from "@/lib/chatReset";
 
 // WHY outline icons, not emoji: emoji looked homemade; these match the app.
 const TABS: { href: string; label: string; icon: IconName }[] = [
@@ -25,6 +26,8 @@ export function TabBar() {
           <Link
             key={tab.href}
             href={tab.href}
+            // Tapping Chat always starts fresh: back to the suggested questions.
+            onClick={tab.href === "/chat" ? requestChatReset : undefined}
             className={`flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] ${
               active ? "font-semibold text-accent" : "text-muted"
             }`}

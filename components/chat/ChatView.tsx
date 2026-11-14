@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
+import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
 import { MessageBubble } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
 
@@ -145,16 +146,44 @@ export function ChatView() {
     setWhatIfKey((k) => k + 1);
   }
 
+  // The request in flight, so "new chat" can cancel it (its late reply must not show up).
+  const inFlight = useRef<AbortController | null>(null);
+
+  /** Back to the start screen with the suggested questions. */
+  function resetChat() {
+    inFlight.current?.abort();
+    inFlight.current = null;
+    setMessages([]);
+    setWhatIf(null);
+    setLoading(false);
+    window.scrollTo({ top: 0 });
+  }
+
+  // Tapping the Chat tab starts a new chat (see lib/chatReset.ts).
+  const seenReset = useRef(getChatResetCount());
+  useEffect(() => {
+    const check = () => {
+      if (getChatResetCount() === seenReset.current) return;
+      seenReset.current = getChatResetCount();
+      resetChat();
+    };
+    check(); // the tab was tapped while this page was hidden
+    window.addEventListener(CHAT_RESET_EVENT, check);
+    return () => window.removeEventListener(CHAT_RESET_EVENT, check);
+  }, []);
+
   async function send(text: string) {
     const next: ChatMessage[] = [...messages, { role: "user", text }];
     setMessages(next);
     setLoading(true);
+    const controller = new AbortController();
+    inFlight.current = controller;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: next }),
-        signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(CLIENT_TIMEOUT_MS)]),
       });
       // WHY read text first: if the server crashed it may send HTML, not JSON.
       const raw = await res.text();
@@ -167,11 +196,13 @@ export function ChatView() {
         );
       }
       if (!res.ok) throw new Error(data.detail || data.error || `HTTP ${res.status}`);
+      if (controller.signal.aborted) return; // new chat started meanwhile
       const { reply, mode } = data as ChatResponse;
       setMode(mode);
       setMessages((m) => [...m, reply]); // WHY functional: keeps notes added while waiting
       if (reply.whatIf) showWhatIf(reply.whatIf);
     } catch (err) {
+      if (controller.signal.aborted) return; // user started a new chat — drop it quietly
       const text =
         err instanceof DOMException && err.name === "TimeoutError"
           ? `No answer after ${CLIENT_TIMEOUT_MS / 1000}s. Check the npm run dev terminal for [ai] lines.`
@@ -183,7 +214,10 @@ export function ChatView() {
       console.error("[chat]", err); // browser DevTools console
       setMessages((m) => [...m, { role: "assistant", text: `⚠️ ${text}` }]);
     } finally {
-      setLoading(false);
+      if (inFlight.current === controller) {
+        inFlight.current = null;
+        setLoading(false);
+      }
     }
   }
 
