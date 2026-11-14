@@ -16,6 +16,7 @@ import { MoneyText } from "@/components/chat/MoneyText";
 import { formatValue } from "@/components/charts/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
+import { BottomSheet } from "@/components/ui/BottomSheet";
 
 const KIND: Record<InsightKind, { label: string; icon: IconName; tap: string }> = {
   save_help: { label: "Help to save", icon: "piggy", tap: "Tap to see how" },
@@ -29,90 +30,61 @@ const toneClass = (tone?: string) =>
 
 /** The full insight, in a sheet that slides up from the bottom. */
 function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-40 mx-auto flex max-w-md flex-col justify-end bg-black/40" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={insight.title}
-        className="max-h-[85dvh] overflow-y-auto rounded-t-2xl bg-background px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium text-muted">{KIND[insight.kind].label}</p>
-            <h2 className="mt-0.5 text-lg font-semibold leading-snug">{insight.title}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
-          >
-            <Icon name="close" size={20} />
-          </button>
-        </div>
+    <BottomSheet label={KIND[insight.kind].label} title={insight.title} onClose={onClose}>
+      <p className="mt-2 text-[15px] leading-snug">
+        <MoneyText text={insight.detail} />
+      </p>
 
-        <p className="mt-2 text-[15px] leading-snug">
-          <MoneyText text={insight.detail} />
+      {insight.table && insight.table.length > 0 && (
+        <table className="mt-3 w-full rounded-xl bg-surface text-sm shadow-sm">
+          <tbody>
+            {insight.table.map((r, i) => (
+              <tr key={i} className="border-b border-line last:border-0">
+                <td className="px-3 py-2">{r.label}</td>
+                <td className={`px-3 py-2 text-right tabular-nums ${toneClass(r.tone)}`}>
+                  {formatValue(r.value, "€")}
+                </td>
+              </tr>
+            ))}
+            {insight.total && (
+              <tr className="border-t border-line font-semibold">
+                <td className="px-3 py-2">{insight.total.label}</td>
+                <td className={`px-3 py-2 text-right tabular-nums ${toneClass(insight.table[0]?.tone)}`}>
+                  {formatValue(insight.total.value, "€")}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      )}
+
+      <div className="mt-3 rounded-xl bg-accent/10 p-3">
+        <p className="text-xs font-semibold text-accent">Try this</p>
+        <p className="mt-0.5 text-[15px] leading-snug">
+          <MoneyText text={insight.action} />
         </p>
-
-        {insight.table && insight.table.length > 0 && (
-          <table className="mt-3 w-full rounded-xl bg-surface text-sm shadow-sm">
-            <tbody>
-              {insight.table.map((r, i) => (
-                <tr key={i} className="border-b border-line last:border-0">
-                  <td className="px-3 py-2">{r.label}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${toneClass(r.tone)}`}>
-                    {formatValue(r.value, "€")}
-                  </td>
-                </tr>
-              ))}
-              {insight.total && (
-                <tr className="border-t border-line font-semibold">
-                  <td className="px-3 py-2">{insight.total.label}</td>
-                  <td className={`px-3 py-2 text-right tabular-nums ${toneClass(insight.table[0]?.tone)}`}>
-                    {formatValue(insight.total.value, "€")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        )}
-
-        <div className="mt-3 rounded-xl bg-accent/10 p-3">
-          <p className="text-xs font-semibold text-accent">Try this</p>
-          <p className="mt-0.5 text-[15px] leading-snug">
-            <MoneyText text={insight.action} />
-          </p>
-        </div>
-
-        {/* WHY folded: most people only need the "what" and "try this"; the reasoning is there if they want it. */}
-        <details className="mt-3 text-sm">
-          <summary className="cursor-pointer text-muted">Why am I seeing this?</summary>
-          <p className="mt-1 text-muted">
-            <MoneyText text={insight.why} colors={false} />
-          </p>
-        </details>
-
-        <Link
-          href={`/chat?ask=${encodeURIComponent(insight.ask)}`}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-3 text-sm font-semibold text-accent-foreground"
-        >
-          <Icon name="chat" size={18} /> Ask the coach about this
-        </Link>
       </div>
-    </div>
+
+      {/* WHY folded: most people only need the "what" and "try this"; the reasoning is there if they want it. */}
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer text-muted">Why am I seeing this?</summary>
+        <p className="mt-1 text-muted">
+          <MoneyText text={insight.why} colors={false} />
+        </p>
+      </details>
+
+      <Link
+        href={`/chat?ask=${encodeURIComponent(insight.ask)}`}
+        className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-accent py-3 text-sm font-semibold text-accent-foreground"
+      >
+        <Icon name="chat" size={18} /> Ask the coach about this
+      </Link>
+    </BottomSheet>
   );
 }
 
-export function InsightCards() {
+export function InsightCards({ title = "For you" }: { title?: string }) {
   const [insights, setInsights] = useState<Insight[] | null>(null);
   const [open, setOpen] = useState<Insight | null>(null);
 
@@ -151,7 +123,7 @@ export function InsightCards() {
   if (insights.length === 0) return null;
   return (
     <section>
-      <h2 className="mb-2 px-1 text-sm font-semibold">For you</h2>
+      <h2 className="mb-2 px-1 text-sm font-semibold">{title}</h2>
       {/* WHY scroll-px-4: tiles snap in line with the page edge; scrollbar hidden (swipe is enough). */}
       <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {insights.map((i) => {

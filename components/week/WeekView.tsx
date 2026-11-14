@@ -28,7 +28,9 @@ import type { Basket, WeekSummary } from "@/lib/types";
 import { BASKETS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
+import Link from "next/link";
 import { DevHeaderButton } from "@/components/DevButton";
+import { Icon } from "@/components/ui/Icon";
 import { Skeleton, SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 
 const TYPE_COLOR: Record<Basket, string> = {
@@ -78,8 +80,14 @@ export function WeekView() {
     <div className="h-full overflow-y-auto" onClick={focus ? clearOnOutsideTap : undefined}>
       {/* Title on the left, dates on the right, same size (team call: far apart).
           On phones the 🛠 team-hub link sits after the dates (components/DevButton.tsx). */}
-      <header className="flex items-baseline justify-between gap-4 border-b border-line bg-surface px-4 py-3">
-        <h1 className="font-semibold">Last 7 days</h1>
+      <header className="flex items-center justify-between gap-4 border-b border-line bg-surface px-4 py-3">
+        {/* WHY a back arrow: this page is now opened from Home's spending breakdown (no own tab). */}
+        <h1 className="flex items-center gap-1 font-semibold">
+          <Link href="/home" aria-label="Back to Home" className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-muted">
+            <Icon name="chevron" size={20} className="rotate-180" />
+          </Link>
+          Last 7 days
+        </h1>
         <div className="flex items-center gap-2">
           {data && (
             <span className="text-muted tabular-nums">
@@ -116,8 +124,8 @@ export function WeekView() {
   );
 }
 
-/** Total spent + one bar split into the 3 types, with their amounts under it. */
-function Hero({
+/** Total spent + one bar split into the 3 types, with their amounts under it. Also on Home. */
+export function Hero({
   data,
   focus,
   onFocus,
@@ -263,22 +271,27 @@ function ByDay({
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-/** Top categories: podium medals, name, amount; a thin bar in its type colour shows the size. */
-function TopCategories({
+/**
+ * Top categories: podium medals, name, amount; a thin bar in its type colour shows the size.
+ * Also on Home, with `limit` (the podium only).
+ */
+export function TopCategories({
   data,
   focus,
   onFocus,
+  limit,
 }: {
   data: WeekSummary;
   focus: Basket | null;
   onFocus: (b: Basket) => void;
+  limit?: number;
 }) {
   const max = data.topCategories[0]?.value || 1;
   return (
     <section className="rounded-2xl p-4 shadow-sm" style={{ background: CARD_TINT }}>
       <h2 className="mb-3 text-sm font-semibold">Top categories</h2>
       <ul className="space-y-3">
-        {data.topCategories.map((r, i) => {
+        {data.topCategories.slice(0, limit).map((r, i) => {
           const type = data.topCategoryBaskets[i] ?? "everyday";
           const color = TYPE_COLOR[type];
           return (

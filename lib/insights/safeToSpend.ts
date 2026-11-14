@@ -4,21 +4,24 @@
  *
  * Simple, explainable formula (all numbers shown to the user):
  *   balance today
- *   − fixed costs expected before next payday   (bills + subscriptions + automatic
- *                                                 savings, per month × days / 30)
+ *   − fixed costs due before next payday          (bills + subscriptions + automatic
+ *                                                 savings, each on its usual day of the
+ *                                                 month: upcomingPayments)
  *   − surprise buffer before next payday          (average irregular costs per
  *                                                 month × days / 30)
  *   = safe to spend until payday  →  ÷ days = per day  →  × requested days
  *
  * Next payday = last salary + the usual gap between salaries.
- * WHY estimates "per month × days / 30": the data doesn't tell us exact due
- * dates, so we spread monthly costs evenly. Good enough, and easy to explain.
+ * WHY each bill on its usual day (changed 15 Nov, was "per month × days / 30"): rent due
+ * next week must count in full. Spread evenly, Home showed rent coming in 6 days while
+ * calling most of the balance safe to spend. The buffer is still spread evenly: surprise
+ * costs have no usual day.
  */
 import type { ChartRow } from "@/lib/types";
 import { addDays, toDate } from "@/lib/data/dates";
 import { getDataToday, getTransactions, round2 } from "@/lib/data";
 import { irregularBuffer } from "./irregular";
-import { recurringPayments } from "./recurring";
+import { upcomingPayments } from "./recurring";
 
 function daysBetween(a: string, b: string): number {
   return Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86_400_000);
@@ -40,10 +43,9 @@ export function safeToSpend(days = 7) {
   }
   const daysToPayday = nextPayday ? daysBetween(today, nextPayday) : 30;
 
-  const fixedPerMonth = recurringPayments()
-    .items.filter((i) => i.kind !== "habit")
-    .reduce((s, i) => s + i.perMonthEur, 0);
-  const upcomingFixed = (fixedPerMonth * daysToPayday) / 30;
+  // Bills, subscriptions and savings expected up to and including payday (same list as Home's
+  // "Upcoming payments"). WHY including payday: if rent is due that day, be on the safe side.
+  const upcomingFixed = upcomingPayments(daysToPayday).reduce((s, p) => s + p.amountEur, 0);
   const buffer = (irregularBuffer().averagePerMonthEur * daysToPayday) / 30;
 
   const safeUntilPayday = Math.max(0, balance - upcomingFixed - buffer);
