@@ -417,7 +417,9 @@ body {
   }
 }
 .msg-in {
-  animation: msg-in 260ms ease-out both;
+  /* WHY backwards, not both: a kept-on animation turns every bubble into its own layer,
+     so popups inside an older bubble got covered by newer bubbles. */
+  animation: msg-in 260ms ease-out backwards;
 }
 
 /* A saving ({+…} in a reply): one soft green glow after it has counted up. */

@@ -5,6 +5,7 @@
  * small screen, and it's more accessible (screen readers).
  */
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartTitle } from "./ChartTitle";
@@ -18,7 +19,10 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // WHY a portal to <body>: chat bubbles animate in (msg-in), and an element with a
+  // transform/opacity animation traps `position: fixed` children inside itself and
+  // lets later bubbles paint on top. Rendering here keeps this truly full screen.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex justify-center bg-black/40" onClick={onClose}>
       <div
         role="dialog"
@@ -55,6 +59,7 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
             )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
