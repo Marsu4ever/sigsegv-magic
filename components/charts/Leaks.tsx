@@ -15,6 +15,10 @@
  *      "Sparks joy? ✨" chip that turns ALL of that habit's marbles shiny gold
  *      (skip and joy exclude each other — you don't skip what you love)
  *
+ * SAVING GOAL (DECISIONS.md #60c): "Sparks joy" is saved with the goal (POST /api/goal setJoy),
+ * so it lasts and weekly missions never ask you to cut what you love. With a goal set, a habit
+ * that can be this week's mission gets "Make it this week's mission →" (full screen).
+ *
  * WHY yearly numbers: "€11 a time" feels like nothing; "€1,190 a year" doesn't.
  *
  * ANIMATIONS (team liked them — keep them quick, < 1.5 s in total):
@@ -30,6 +34,8 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ChartSpec, LeaksView } from "@/lib/types";
 import { CategoryTile } from "./categoryIcons";
 import { CountUp } from "@/components/ui/CountUp";
+import { useRouter } from "next/navigation";
+import { goalAction, useGoal } from "@/components/goal/api";
 
 const EVERYDAY = "var(--basket-everyday)";
 // WHY theme tokens (app/globals.css), not fixed colours: the old white-pink box, white jar and
@@ -58,8 +64,24 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
     io.observe(el);
     return () => io.disconnect();
   }, [v]);
-  // Habits the user said "spark joy" — their marbles turn gold.
-  const [joy, setJoy] = useState<Set<string>>(new Set());
+  // Habits the user said "spark joy" — their marbles turn gold. Saved with the goal state;
+  // the local copy makes the tap instant (the server answer follows).
+  const { view: goal } = useGoal();
+  const [joyLocal, setJoyLocal] = useState<Set<string> | null>(null);
+  const joy = useMemo(() => joyLocal ?? new Set(goal?.joy ?? []), [joyLocal, goal?.joy]);
+  const setJoy = (next: Set<string>) => {
+    for (const name of new Set([...joy, ...next])) {
+      if (joy.has(name) !== next.has(name)) goalAction({ action: "setJoy", habit: name, on: next.has(name) });
+    }
+    setJoyLocal(next);
+  };
+  const router = useRouter();
+  const missionFor = (name: string) =>
+    goal?.goal && !goal.result && !goal.mission && goal.candidates.some((c) => c.habit === name);
+  const makeMission = async (name: string) => {
+    const res = await goalAction({ action: "pickMission", habit: name });
+    if (!res.error) router.push("/week#goal");
+  };
 
   const saved = (v?.habits ?? [])
     .filter((h) => h.skip && skipped.has(h.name))
@@ -189,6 +211,8 @@ export function LeaksChart({ spec, compact }: { spec: ChartSpec; compact: boolea
             onSkip={() => toggleSkip(h.name)}
             joy={joy.has(h.name)}
             onJoy={() => toggleJoy(h.name)}
+            isMission={goal?.mission?.habit === h.name}
+            onMission={missionFor(h.name) ? () => makeMission(h.name) : undefined}
           />
         ))}
       </div>
@@ -382,6 +406,8 @@ function HabitCard({
   onSkip,
   joy,
   onJoy,
+  isMission,
+  onMission,
 }: {
   h: LeaksView["habits"][number];
   index: number;
@@ -390,6 +416,8 @@ function HabitCard({
   onSkip: () => void;
   joy: boolean;
   onJoy: () => void;
+  isMission?: boolean;
+  onMission?: () => void;
 }) {
   const after = h.skip && skipped ? h.perYearEur - h.skip.savesPerYearEur : null;
   return (
@@ -487,6 +515,17 @@ function HabitCard({
             >
               {h.skip.label}
             </button>
+          )}
+          {/* Saving goal: this habit is this week's mission, or could be. */}
+          {isMission ? (
+            <span className="self-center text-xs font-semibold text-accent">🎯 This week&apos;s mission</span>
+          ) : (
+            onMission &&
+            !joy && (
+              <button type="button" onClick={onMission} className="self-center text-xs font-semibold text-accent">
+                Make it this week&apos;s mission →
+              </button>
+            )
           )}
         </div>
       )}
