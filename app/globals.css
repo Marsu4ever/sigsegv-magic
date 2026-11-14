@@ -39,17 +39,14 @@ body {
   color: var(--foreground);
 }
 
-/* WHY: Recharts makes chart parts focusable (for keyboard users), so a mouse
-   click drew a blue/black focus box around them. Keyboard focus still shows. */
-.recharts-wrapper *:focus:not(:focus-visible),
-.recharts-wrapper:focus:not(:focus-visible) {
-  outline: none;
-}
-.recharts-wrapper svg:focus,
-.recharts-wrapper g:focus,
-.recharts-wrapper path:focus,
-.recharts-wrapper *:focus-visible {
-  outline: none;
+/* WHY: a click on a chart drew a blue/black focus box (Recharts made the
+   chart focusable). Charts are now not focusable (accessibilityLayer={false});
+   this is the safety net for anything inside a chart that still takes focus. */
+.recharts-responsive-container,
+.recharts-responsive-container *,
+.recharts-wrapper,
+.recharts-wrapper * {
+  outline: none !important;
 }
 /* WHY: on phones a long press on a chart selected it (blue box) or opened the
    "save image" menu. Charts aren't text to copy, so turn both off. */

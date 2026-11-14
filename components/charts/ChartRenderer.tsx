@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import type { ChartSpec } from "@/lib/types";
 import { basketColor, colorFor } from "./colors";
+import { BasketsChart } from "./Baskets";
 import { HeatmapExplorer, HeatmapPreview } from "./Heatmap";
 import { CumulativeChart } from "./Cumulative";
 
@@ -54,6 +55,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
     return compact ? <HeatmapPreview spec={spec} /> : <HeatmapExplorer spec={spec} />;
   }
   if (spec.type === "cumulative") return <CumulativeChart spec={spec} compact={compact} />;
+  if (spec.type === "baskets") return <BasketsChart spec={spec} compact={compact} />;
 
   const monthly = isMonthly(spec.rows);
   // Two series side by side (e.g. "You" vs "Typical")? Only when rows have value2.
@@ -126,7 +128,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
       <div style={{ width: "100%", height }}>
         <ResponsiveContainer>
           {spec.type === "pie" ? (
-            <PieChart>
+            <PieChart accessibilityLayer={false}>
               <Pie
                 data={data}
                 dataKey="value"
@@ -138,7 +140,11 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
               {tooltip}
             </PieChart>
           ) : spec.type === "line" ? (
-            <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <LineChart
+              accessibilityLayer={false}
+              data={data}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} width={40} />
@@ -162,6 +168,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
             </LineChart>
           ) : (
             <BarChart
+              accessibilityLayer={false}
               data={data}
               margin={{ top: 8, right: 8, bottom: 0, left: tiltLabels ? 24 : 0 }}
             >

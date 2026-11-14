@@ -7,6 +7,8 @@
  */
 import type { ChatRequest, ChatResponse } from "@/lib/types";
 import { runChat } from "@/lib/ai/chat";
+import { getCustomerId } from "@/lib/data";
+import { withPickedCustomer } from "@/lib/data/request";
 
 export async function POST(request: Request) {
   const start = Date.now();
@@ -21,10 +23,15 @@ export async function POST(request: Request) {
   }
 
   const question = body.messages.at(-1)?.text ?? "";
-  console.log(`[api/chat] ← "${question.slice(0, 80)}" (${body.messages.length} messages)`);
 
   try {
-    const result: ChatResponse = await runChat(body.messages);
+    // WHY wrapped: the AI's tools then read the customer picked in the app (lib/data/request.ts).
+    const result: ChatResponse = await withPickedCustomer(() => {
+      console.log(
+        `[api/chat] ← customer=${getCustomerId()} "${question.slice(0, 80)}" (${body.messages.length} messages)`,
+      );
+      return runChat(body.messages);
+    });
     console.log(`[api/chat] → done in ${Date.now() - start}ms`);
     return Response.json(result);
   } catch (err) {

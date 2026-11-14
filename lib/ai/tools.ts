@@ -15,6 +15,8 @@
  * - building blocks: small, flexible (spend_by_category, income_summary, …)
  * - ready-made insights: answer the challenge's flagship questions in one
  *   step (spender_profile, everyday_leaks, what_if, safe_to_spend, …)
+ * - home loan: mortgage_status (+ mortgage_financing for charts), from
+ *   lib/data/mortgage.ts. { hasMortgage: false } for customers who never applied.
  *
  * TO ADD A TOOL: write the function in lib/data or lib/insights, then add one
  * entry to TOOLS below. If it returns `rows`, set chartable: true and it can
@@ -43,10 +45,12 @@ import { compareToPeers, getBenchmarks } from "@/lib/insights/benchmarks";
 import { everydayLeaks } from "@/lib/insights/leaks";
 import { irregularBuffer } from "@/lib/insights/irregular";
 import { monthProgress } from "@/lib/insights/monthProgress";
+import { basketTree } from "@/lib/insights/basketTree";
 import { recurringPayments } from "@/lib/insights/recurring";
 import { safeToSpend } from "@/lib/insights/safeToSpend";
 import { spenderProfile } from "@/lib/insights/spenderProfile";
 import { whatIf } from "@/lib/insights/whatIf";
+import { getMortgageSummary } from "@/lib/data/mortgage";
 
 type Args = Record<string, unknown>;
 
@@ -59,6 +63,9 @@ type ToolOutput = Record<string, unknown> & {
   /** List shown under the chart (ChartSpec.items). Not sent to the LLM. */
   chartList?: ChartSpec["items"];
   monthNav?: ChartSpec["monthNav"];
+  /** Basket tree for the "baskets" chart (ChartSpec.baskets). */
+  basketTree?: ChartSpec["baskets"];
+  periodLabel?: string;
 };
 
 type Tool = {
@@ -147,6 +154,36 @@ const TOOLS: Tool[] = [
       const range = rangeFrom(a, "last_30_days");
       const totals = basketBreakdown(range);
       return { range, rows: BASKETS.map((b) => ({ label: BASKET_LABELS[b], value: totals[b] })) };
+    },
+  },
+  {
+    name: "basket_details",
+    description:
+      "The 3 baskets in a period, each split into categories, and each category into merchant types " +
+      "(e.g. Groceries → Supermarket, Convenience store), with euros and counts, biggest first. " +
+      "Use with show_chart chart_type 'baskets'.",
+    properties: { ...periodProps },
+    required: ["period"],
+    chartable: true,
+    run: (a) => {
+      const range = rangeFrom(a, "this_month");
+      const t = basketTree(range);
+      const d = (s: string) => `${Number(s.slice(8))}.${Number(s.slice(5, 7))}.`;
+      return {
+        range,
+        totalEur: t.total,
+        // WHY no single purchases for the AI: too long; the screen gets them (basketTree).
+        baskets: t.baskets.map((b) => ({
+          ...b,
+          categories: b.categories.map((c) => ({
+            ...c,
+            merchants: c.merchants.map(({ name, total, count }) => ({ name, total, count })),
+          })),
+        })),
+        rows: t.baskets.map((b) => ({ label: b.label, value: b.total })),
+        basketTree: t.baskets,
+        periodLabel: `${d(range.from)}–${d(range.to)}${range.to.slice(0, 4)}`,
+      };
     },
   },
   {
@@ -394,10 +431,51 @@ const TOOLS: Tool[] = [
     chartable: true,
     run: () => irregularBuffer(),
   },
+
+  // ── Home loan ──────────────────────────────────────────────────────────
+  {
+    name: "mortgage_status",
+    description:
+      "The user's home loan (mortgage) application: the bank's decision and rejection reason, property, loan, " +
+      "own money (equity), loan-to-value, collateral, costs the bank recorded, required monthly income, the user's " +
+      "average monthly income and spending (last 12 months), and a timeline. hasMortgage=false if they never applied.",
+    properties: {},
+    chartable: false,
+    run: () => {
+      const m = getMortgageSummary();
+      if (!m) return { hasMortgage: false };
+      return {
+        hasMortgage: true,
+        ...m,
+        // WHY: the bank's verdict is final data; the AI must not invent its own (see prompt).
+        note: "decision and rejectionReason are the bank's own record. requiredMonthlyIncomeEur is the bank's figure.",
+        // undefined fields are dropped by JSON.stringify (fewer tokens, no long notes)
+        timeline: m.timeline.map((e) => ({ ...e, note: undefined, time: undefined })),
+      };
+    },
+  },
+  {
+    name: "mortgage_financing",
+    description:
+      "Loan vs own money (equity) for the user's home, as chart rows. Use with show_chart (pie or bar). No period needed.",
+    properties: {},
+    chartable: true,
+    run: () => {
+      const m = getMortgageSummary();
+      return {
+        rows: m
+          ? [
+              { label: "Loan", value: m.loanEur },
+              { label: "Own money", value: m.equityEur },
+            ]
+          : [],
+      };
+    },
+  },
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
-const CHART_TYPES = ["bar", "line", "pie", "table", "heatmap", "cumulative"] as const;
+const CHART_TYPES = ["bar", "line", "pie", "table", "heatmap", "cumulative", "baskets"] as const;
 const CHARTABLE = TOOLS.filter((t) => t.chartable).map((t) => t.name);
 
 /** Every argument any chartable tool accepts — show_chart's data_args schema. */
@@ -429,7 +507,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         "days and switch months). For 'heatmap' the server always uses daily spending — just pass period/from/to " +
         "and optionally category in data_args (data_tool can be spend_over_time). " +
         "'cumulative' = month so far vs last month with a projection to month end (data_tool month_progress, " +
-        "optional month 'YYYY-MM').",
+        "optional month 'YYYY-MM'). " +
+        "'baskets' = the 3 baskets with their categories; the user can tap a category to see what's inside " +
+        "(data_tool basket_details, period).",
       parameters: {
         type: "object",
         properties: {
@@ -464,8 +544,10 @@ const MAX_ROWS_FOR_LLM = 60;
 
 function forLlm(full: ToolOutput): string {
   // WHY drop chartList: it's for the screen; the LLM already gets the same data.
-  const { chartList: _unused, ...out } = full;
+  // basketTree is the same data as `baskets`, kept for the screen only.
+  const { chartList: _unused, basketTree: _sameAsBaskets, ...out } = full;
   void _unused;
+  void _sameAsBaskets;
   // WHY rename value/value2 to the series names ("You" / "Typical age 26-35"):
   // with bare value/value2 the model mixed up which number was whose.
   const names = out.seriesNames;
@@ -516,7 +598,9 @@ export function runTool(name: string, args: Args): ToolResult {
           })
         : type === "cumulative"
           ? BY_NAME.get("month_progress")!.run(dataArgs as Args)
-          : dataTool.run(dataArgs as Args);
+          : type === "baskets"
+            ? BY_NAME.get("basket_details")!.run(dataArgs as Args)
+            : dataTool.run(dataArgs as Args);
     const rows = out.rows ?? [];
     const chart: ChartSpec = {
       type,
@@ -527,6 +611,8 @@ export function runTool(name: string, args: Args): ToolResult {
       ...(out.facts ? { facts: out.facts } : {}),
       ...(out.chartList ? { items: out.chartList } : {}),
       ...(out.monthNav ? { monthNav: out.monthNav } : {}),
+      ...(out.basketTree ? { baskets: out.basketTree } : {}),
+      ...(out.periodLabel ? { periodLabel: out.periodLabel } : {}),
     };
     return { content: JSON.stringify({ shown: true, rows: rows.length }), chart };
   }

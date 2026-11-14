@@ -45,12 +45,15 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
         </header>
         <div className="flex-1 overflow-y-auto p-4">
           <ChartRenderer spec={spec} compact={false} />
-          {/* WHY no extra table for heatmap/cumulative: they show their own details. */}
-          {spec.type !== "table" && spec.type !== "heatmap" && spec.type !== "cumulative" && (
-            <div className="mt-4">
-              <ChartRenderer spec={{ ...spec, type: "table" }} compact={false} />
-            </div>
-          )}
+          {/* WHY no extra table for heatmap/cumulative/baskets: they show their own details. */}
+          {spec.type !== "table" &&
+            spec.type !== "heatmap" &&
+            spec.type !== "cumulative" &&
+            spec.type !== "baskets" && (
+              <div className="mt-4">
+                <ChartRenderer spec={{ ...spec, type: "table" }} compact={false} />
+              </div>
+            )}
         </div>
       </div>
     </div>

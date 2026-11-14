@@ -9,7 +9,13 @@ using the **3 baskets**: mandatory & regular, mandatory & irregular, and everyda
 
 ## Quick start (5 min)
 
-Needs **Node.js 20.9 or newer** (`node -v`).
+Needs **Node.js 20.9 or newer** (`node -v`). With nvm: `nvm use` (the version is in `.nvmrc`).
+
+```bash
+make            # installs packages, creates .env.local the first time, runs the app
+```
+
+No `make` (e.g. Windows)? Same thing with npm:
 
 ```bash
 npm install
@@ -20,7 +26,10 @@ npm run dev
 Open http://localhost:3000. Saving a file updates the browser automatically.
 
 **See it as a phone:** Chrome DevTools (`Cmd+Opt+I`) → device toolbar (`Cmd+Shift+M`) → pick an iPhone.
-**On your real phone (same wifi):** `npm run dev -- -H 0.0.0.0`, then open `http://<your-laptop-ip>:3000`.
+**On your real phone (same wifi):** `make phone`, then open the **Network** address it prints.
+
+**Switch demo customer:** tap **Switch** in the dark **DEMO** bar at the top of the app. The choice is per
+device (a cookie). Default when nothing is picked: `DEMO_CUSTOMER_ID` in `.env.local` (empty = fake MOCK customer).
 
 Out of the box the app uses **fake data** (`data/demo/MOCK.json`) and a **mock AI** (keyword-based answers,
 shown with a yellow "mock AI" badge). Everything works without any keys.
@@ -34,8 +43,8 @@ Click the small **🛠** in the far bottom-right corner of the browser window (o
 | Page | What's there |
 |---|---|
 | http://localhost:3000/dev | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
-| http://localhost:3000/data | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison |
-| http://localhost:3000/customer_profiles | All demo customers grouped by spending type, with the line to copy into `.env.local` |
+| http://localhost:3000/data | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data |
+| http://localhost:3000/customer_profiles | All demo customers grouped by spending type (home-loan customers listed first), with a **Use in app** button |
 | http://localhost:3000/api/health | Is the data loading? Which AI settings are active? |
 
 Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/DevButton.tsx`.
@@ -54,6 +63,7 @@ Chat tab  ── POST /api/chat ──────────► lib/ai/chat.ts
                                               │
           ◄── { text, charts[] } ─────────────┘
 Week tab  ── GET /api/week ───────────► lib/data → getWeekSummary()   (no AI)
+Home loan ── GET /api/mortgage ───────► lib/data/mortgage.ts → getMortgageSummary()   (no AI)
 ```
 
 1. User asks *"How much did I spend on taxis last month?"*
@@ -94,16 +104,20 @@ The raw dataset is ~350 MB and is **not** in our git repo.
    ```
    data/raw/tx_junction_transactions.csv
    data/raw/tx_customers_junction.csv
+   data/raw/mtg_tx_customer_link_and_final_mtg_infio.csv   # home loans: final decision per application
+   data/raw/mtg_negotiation_history.csv                    # home loans: every step of each application
    ```
+   ⚠️ Keep them inside `data/raw/` — only that folder is git-ignored.
 4. Run:
    ```bash
    npm run prepare-data                          # 30 varied customers (6 per age group, low → high spenders)
+                                                 #  + 12 home-loan customers (every approve/reject outcome)
    npm run prepare-data -- --customers CUST00001  # or pick specific ones
    ```
    This writes `data/demo/<customer>.json` (small — **commit these** so teammates don't need the raw CSV)
    and `data/demo/_categories.json` (every category name, to fix the basket table).
-5. In `.env.local` set `DEMO_CUSTOMER_ID=CUST000xx` and restart `npm run dev`.
-   Easiest: pick one on http://localhost:3000/customer_profiles and copy its line.
+5. Pick a customer with **Switch** in the dark bar at the top of the app. (Optional default for everyone:
+   `DEMO_CUSTOMER_ID=CUST000xx` in `.env.local`.)
 
 The script prints sample rows — check that spending amounts are negative. If not, update `isSpending()`
 in `lib/data/index.ts`.
@@ -160,6 +174,15 @@ Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the 
 5. **`npm run diagnose`** — tests the AI connection straight from Node (DNS, IPv4, IPv6, fetch), outside the app.
 
 ## Useful commands
+
+| Make | What it does |
+|---|---|
+| `make` | Install + run the app |
+| `make phone` | Same, reachable from a phone on the same wifi |
+| `make check` | Typecheck + lint — run before pushing |
+| `make data` | Raw CSVs in `data/raw/` → `data/demo/` |
+
+The npm scripts underneath:
 
 | Command | What it does |
 |---|---|

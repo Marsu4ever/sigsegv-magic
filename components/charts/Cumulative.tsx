@@ -203,6 +203,7 @@ function MonthChart({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
       <div style={{ width: "100%", height: compact ? 170 : 300 }}>
         <ResponsiveContainer>
           <LineChart
+            accessibilityLayer={false}
             data={data}
             margin={{ top: compact ? 8 : 20, right: compact ? 8 : 16, bottom: 0, left: 0 }}
             onClick={(e) => {
@@ -472,7 +473,7 @@ function Expenses({
         <>
           <div style={{ width: "100%", height: 230 }}>
             <ResponsiveContainer>
-              <PieChart>
+              <PieChart accessibilityLayer={false}>
                 {/* outerRadius 72%: leaves room for the small slices' labels outside. */}
                 <Pie
                   data={slices}

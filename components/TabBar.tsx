@@ -9,6 +9,8 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/chat", label: "Chat", icon: "💬" },
   { href: "/week", label: "This week", icon: "📅" },
+  // WHY always shown: customers without a mortgage get a friendly empty state.
+  { href: "/loan", label: "Home loan", icon: "🏠" },
 ];
 
 export function TabBar() {

@@ -10,6 +10,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { TabBar } from "@/components/TabBar";
 import { DevButton } from "@/components/DevButton";
+import { CustomerSwitcher } from "@/components/CustomerSwitcher";
 
 export const metadata: Metadata = {
   title: "Money Coach",
@@ -29,6 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="font-sans antialiased">
         <div className="mx-auto flex h-dvh max-w-md flex-col bg-background">
+          {/* Demo-only: whose data is shown + switch customer. */}
+          <CustomerSwitcher />
           <main className="min-h-0 flex-1">{children}</main>
           <TabBar />
         </div>
