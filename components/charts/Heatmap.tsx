@@ -11,7 +11,7 @@
  * Input: ChartSpec rows with one row per day, label "YYYY-MM-DD"
  * (show_chart makes these with spend_over_time, group_by "day").
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Basket, ChartRow, ChartSpec, DaySpending } from "@/lib/types";
 import { BASKET_LABELS } from "@/lib/types";
 
@@ -94,6 +94,7 @@ function MonthGrid({
   onSelect,
   onHover,
   showAmounts,
+  afterWeek,
 }: {
   month: string; // "YYYY-MM"
   byDate: Map<string, number>;
@@ -103,6 +104,8 @@ function MonthGrid({
   onSelect?: (date: string) => void;
   onHover?: (date: string | null, cell: HTMLElement | null) => void;
   showAmounts?: boolean; // euros inside each day (full screen only — too small in chat)
+  /** Something to show right under a week's row (the clicked day's list). */
+  afterWeek?: (monday: string) => React.ReactNode;
 }) {
   const first = `${month}-01`;
   const last = lastDayOfMonth(month);
@@ -125,72 +128,75 @@ function MonthGrid({
         ))}
       </div>
       {weeks.map((monday) => (
-        <div key={monday} className="flex" style={{ gap }}>
-          {WEEKDAYS.map((_, i) => {
-            const date = addDays(monday, i);
-            const inMonth = date >= first && date <= last;
-            if (!inMonth) return <div key={date} style={{ width: cell, height: cell }} />;
-            const v = byDate.get(date);
-            const hasData = v !== undefined;
-            const isSel = date === selected;
-            // WHY a <div> when not clickable: the preview sits inside the chat
-            // card's <button>, and a button inside a button is invalid HTML.
-            const Cell = onSelect ? "button" : "div";
-            return (
-              <Cell
-                key={date}
-                {...(onSelect
-                  ? {
-                      type: "button" as const,
-                      disabled: !hasData,
-                      onClick: () => onSelect(date),
-                      "aria-label": hasData ? `${date}, spent ${eur(v!)}` : `${date}, no data`,
-                    }
-                  : {})}
-                // WHY mouse only: on phones a tap already opens the full
-                // list, a hover popup would just flash.
-                onPointerEnter={(e: React.PointerEvent<HTMLElement>) =>
-                  hasData && e.pointerType === "mouse" && onHover?.(date, e.currentTarget)
-                }
-                onPointerLeave={() => onHover?.(null, null)}
-                title={onHover ? undefined : hasData ? `${date}: ${eur(v!)}` : `${date}: no data`}
-                className="relative flex items-center justify-center rounded"
-                style={{
-                  width: cell,
-                  height: cell,
-                  background: hasData ? LEVEL_COLORS[level(v!)] : "transparent",
-                  border: hasData ? "none" : "1px dashed var(--line)",
-                  outline: isSel ? "2px solid var(--foreground)" : "none",
-                  outlineOffset: 1,
-                  fontSize: cell >= 28 ? 11 : 0,
-                  color: hasData && level(v!) >= 3 ? "white" : "var(--muted)",
-                }}
-              >
-                {showAmounts ? (
-                  <>
-                    {/* Day number small in the corner, euros big in the middle. */}
-                    <span className="absolute left-1 top-0.5 text-[10px] leading-none opacity-80">
-                      {Number(date.slice(8))}
-                    </span>
-                    {hasData && v! > 0 && (
-                      <span
-                        className="font-semibold tabular-nums"
-                        style={{
-                          fontSize: Math.min(14, cell / 4.2),
-                          color: level(v!) >= 3 ? "white" : "var(--foreground)",
-                        }}
-                      >
-                        {shortEur(v!)}
+        <Fragment key={monday}>
+          <div className="flex" style={{ gap }}>
+            {WEEKDAYS.map((_, i) => {
+              const date = addDays(monday, i);
+              const inMonth = date >= first && date <= last;
+              if (!inMonth) return <div key={date} style={{ width: cell, height: cell }} />;
+              const v = byDate.get(date);
+              const hasData = v !== undefined;
+              const isSel = date === selected;
+              // WHY a <div> when not clickable: the preview sits inside the chat
+              // card's <button>, and a button inside a button is invalid HTML.
+              const Cell = onSelect ? "button" : "div";
+              return (
+                <Cell
+                  key={date}
+                  {...(onSelect
+                    ? {
+                        type: "button" as const,
+                        disabled: !hasData,
+                        onClick: () => onSelect(date),
+                        "aria-label": hasData ? `${date}, spent ${eur(v!)}` : `${date}, no data`,
+                      }
+                    : {})}
+                  // WHY mouse only: on phones a tap already opens the full
+                  // list, a hover popup would just flash.
+                  onPointerEnter={(e: React.PointerEvent<HTMLElement>) =>
+                    hasData && e.pointerType === "mouse" && onHover?.(date, e.currentTarget)
+                  }
+                  onPointerLeave={() => onHover?.(null, null)}
+                  title={onHover ? undefined : hasData ? `${date}: ${eur(v!)}` : `${date}: no data`}
+                  className="relative flex items-center justify-center rounded"
+                  style={{
+                    width: cell,
+                    height: cell,
+                    background: hasData ? LEVEL_COLORS[level(v!)] : "transparent",
+                    border: hasData ? "none" : "1px dashed var(--line)",
+                    outline: isSel ? "2px solid var(--foreground)" : "none",
+                    outlineOffset: 1,
+                    fontSize: cell >= 28 ? 11 : 0,
+                    color: hasData && level(v!) >= 3 ? "white" : "var(--muted)",
+                  }}
+                >
+                  {showAmounts ? (
+                    <>
+                      {/* Day number small in the corner, euros big in the middle. */}
+                      <span className="absolute left-1 top-0.5 text-[10px] leading-none opacity-80">
+                        {Number(date.slice(8))}
                       </span>
-                    )}
-                  </>
-                ) : (
-                  Number(date.slice(8))
-                )}
-              </Cell>
-            );
-          })}
-        </div>
+                      {hasData && v! > 0 && (
+                        <span
+                          className="font-semibold tabular-nums"
+                          style={{
+                            fontSize: Math.min(14, cell / 4.2),
+                            color: level(v!) >= 3 ? "white" : "var(--foreground)",
+                          }}
+                        >
+                          {shortEur(v!)}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    Number(date.slice(8))
+                  )}
+                </Cell>
+              );
+            })}
+          </div>
+          {afterWeek?.(monday)}
+        </Fragment>
       ))}
     </div>
   );
@@ -353,6 +359,7 @@ function useHover(
   box: React.RefObject<HTMLDivElement | null>,
   loadDay: (date: string) => void,
   width: number,
+  height: number, // rough popup height, to see if it fits below
 ) {
   const [hover, setHover] = useState<HoverState>(null);
   const onHover = useCallback(
@@ -361,7 +368,10 @@ function useHover(
       loadDay(date);
       const b = box.current.getBoundingClientRect();
       const c = cell.getBoundingClientRect();
-      const above = c.top - b.top > b.height / 2; // lower rows: pop up above
+      // WHY below by default (team decision): it reads like a dropdown. Only pop
+      // up when there's no room below in the window and more room above.
+      const roomBelow = window.innerHeight - c.bottom;
+      const above = roomBelow < height && c.top > roomBelow;
       const center = c.left - b.left + c.width / 2;
       setHover({
         date,
@@ -370,7 +380,7 @@ function useHover(
         above,
       });
     },
-    [box, loadDay, width],
+    [box, loadDay, width, height],
   );
   return { hover, setHover, onHover };
 }
@@ -433,7 +443,7 @@ export function HeatmapPreview({ spec }: { spec: ChartSpec }) {
   const box = useRef<HTMLDivElement>(null);
   const cell = useCellSize(box, 56);
   const { days, loadDay } = useDayCache();
-  const { hover, onHover } = useHover(box, loadDay, PREVIEW_POPUP_W);
+  const { hover, onHover } = useHover(box, loadDay, PREVIEW_POPUP_W, 170);
   if (!lastMonth) return <p className="py-6 text-center text-sm text-muted">No data.</p>;
   const monthRows = spec.rows.filter((r) => r.label.startsWith(lastMonth));
   const total = monthRows.reduce((sum, r) => sum + r.value, 0);
@@ -484,14 +494,14 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
   const details = useRef<HTMLDivElement>(null);
   const cell = useCellSize(gridBox, 88);
   const { days, loadDay } = useDayCache();
-  const { hover, setHover, onHover } = useHover(gridBox, loadDay, POPUP_W);
+  const { hover, setHover, onHover } = useHover(gridBox, loadDay, POPUP_W, 300);
 
   const onSelect = useCallback(
     (date: string) => {
       loadDay(date);
       setSelected(date);
       setHover(null);
-      // Bring the full list into view (it sits below the calendar).
+      // Bring the list (it opens under the clicked week) into view.
       setTimeout(
         () =>
           details.current?.scrollIntoView({
@@ -549,6 +559,11 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
           selected={selected}
           onSelect={onSelect}
           onHover={onHover}
+          afterWeek={(monday) =>
+            selected && selected >= monday && selected <= addDays(monday, 6) ? (
+              <DayPanel panelRef={details} selected={selected} day={day} />
+            ) : null
+          }
         />
 
         {/* Hover popup: quick look at the day, biggest purchases first. */}
@@ -567,38 +582,55 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
         <Legend />
       </div>
 
-      {/* Day details (after a click/tap) */}
-      <div ref={details} className="scroll-mt-4 rounded-xl border border-line p-3">
-        {!selected && (
-          <p className="text-sm text-muted">
-            Hover a day for a quick look, tap it to see everything.
-          </p>
-        )}
-        {selected && day && "error" in day && (
-          <p className="text-sm text-red-600">⚠️ {day.error}</p>
-        )}
-        {selected && !day && <p className="text-sm text-muted">Loading…</p>}
-        {selected && day && !("error" in day) && (
-          <div>
-            <div className="flex items-baseline justify-between">
-              <span className="font-semibold">{dayTitle(day.date)}</span>
-              <span className="font-semibold tabular-nums">{eur(day.totalEur)}</span>
-            </div>
-            <p className="mb-2 text-xs text-muted">
-              {day.transactions.length} purchase
-              {day.transactions.length === 1 ? "" : "s"}, biggest first
-              {day.incomeEur > 0 && (
-                <span className="text-accent"> · + {eur(day.incomeEur)} income this day</span>
-              )}
-            </p>
-            {day.transactions.length === 0 ? (
-              <p className="text-sm text-muted">No spending this day. 🎉</p>
-            ) : (
-              <DayList key={day.date} day={day} />
-            )}
+      {!selected && (
+        <p className="text-center text-sm text-muted">
+          Hover a day for a quick look, tap it to see everything.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The clicked day's purchases, biggest first — opens like a dropdown right
+ * under the clicked week (WHY: next to the day, not at the bottom of the page).
+ */
+function DayPanel({
+  panelRef,
+  selected,
+  day,
+}: {
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  selected: string;
+  day: DaySpending | { error: string } | undefined;
+}) {
+  return (
+    <div
+      ref={panelRef}
+      className="my-1 scroll-mt-4 rounded-xl border border-line bg-surface p-3 shadow-sm"
+    >
+      {day && "error" in day && <p className="text-sm text-red-600">⚠️ {day.error}</p>}
+      {!day && <p className="text-sm text-muted">Loading…</p>}
+      {day && !("error" in day) && (
+        <div>
+          <div className="flex items-baseline justify-between">
+            <span className="font-semibold">{dayTitle(selected)}</span>
+            <span className="font-semibold tabular-nums">{eur(day.totalEur)}</span>
           </div>
-        )}
-      </div>
+          <p className="mb-2 text-xs text-muted">
+            {day.transactions.length} purchase{day.transactions.length === 1 ? "" : "s"}, biggest
+            first
+            {day.incomeEur > 0 && (
+              <span className="text-accent"> · + {eur(day.incomeEur)} income this day</span>
+            )}
+          </p>
+          {day.transactions.length === 0 ? (
+            <p className="text-sm text-muted">No spending this day. 🎉</p>
+          ) : (
+            <DayList key={selected} day={day} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -58,6 +58,7 @@ type ToolOutput = Record<string, unknown> & {
   facts?: ChartSpec["facts"];
   /** List shown under the chart (ChartSpec.items). Not sent to the LLM. */
   chartList?: ChartSpec["items"];
+  monthNav?: ChartSpec["monthNav"];
 };
 
 type Tool = {
@@ -351,7 +352,13 @@ const TOOLS: Tool[] = [
     chartable: true,
     run: (a) => {
       const m = monthProgress(optString(a.month));
-      return { ...m, chartList: m.biggestExpenses };
+      // WHY top 10 for the AI: the screen gets every expense (chartList),
+      // the model only needs the big ones.
+      return {
+        ...m,
+        biggestExpenses: m.biggestExpenses.slice(0, 10),
+        chartList: m.biggestExpenses,
+      };
     },
   },
   {
@@ -488,6 +495,7 @@ export function runTool(name: string, args: Args): ToolResult {
       ...(out.seriesNames ? { seriesNames: out.seriesNames } : {}),
       ...(out.facts ? { facts: out.facts } : {}),
       ...(out.chartList ? { items: out.chartList } : {}),
+      ...(out.monthNav ? { monthNav: out.monthNav } : {}),
     };
     return { content: JSON.stringify({ shown: true, rows: rows.length }), chart };
   }

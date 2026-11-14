@@ -82,6 +82,8 @@ export type ChartRow = {
   value2?: number;
   /** "cumulative" charts: true = this value is a projection, not real yet. */
   projected?: boolean;
+  /** "cumulative" charts: average running total by this day over the last 12 months. */
+  average?: number;
 };
 
 export type ChartSpec = {
@@ -94,7 +96,18 @@ export type ChartSpec = {
   /** Key numbers shown above/below the chart, e.g. "Spent so far: 1 421 €". */
   facts?: { label: string; value: number }[];
   /** A list shown under the chart in full screen (first 5, tap for more). */
-  items?: { label: string; sub?: string; value: number }[];
+  items?: {
+    label: string;
+    sub?: string;
+    value: number;
+    date?: string; // "YYYY-MM-DD" — lets the chart highlight a picked day
+    group?: string; // e.g. category — used for the pie view of the list
+  }[];
+  /**
+   * Month-by-month charts ("cumulative"): which month is shown and how far the
+   * ‹ › arrows can go. Months are "YYYY-MM". Other months: GET /api/month-progress.
+   */
+  monthNav?: { shown: string; first: string; last: string };
 };
 
 // ─── Chat ────────────────────────────────────────────────────────────────
