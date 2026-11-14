@@ -23,6 +23,7 @@ import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, runTool } from "./tools";
 import { mockReply } from "./mock";
+import { noLongDashes } from "@/lib/noDashes";
 
 const MAX_TOOL_ROUNDS = 6;
 /** Max time for ONE request to the LLM. */
@@ -88,7 +89,8 @@ export async function runChat(history: ChatMessage[]): Promise<{
   const config = getAiConfig();
   if (config.mode === "mock") {
     console.log("[ai] mode=mock (set LLM_BASE_URL + LLM_MODEL in .env.local for a real model)");
-    return { reply: mockReply(history), mode: "mock" };
+    const reply = mockReply(history);
+    return { reply: { ...reply, text: noLongDashes(reply.text) }, mode: "mock" };
   }
 
   // WHY log host + model but never the key: enough to spot a typo, safe to share.
@@ -148,7 +150,8 @@ export async function runChat(history: ChatMessage[]): Promise<{
       return {
         reply: {
           role: "assistant",
-          text: msg.content ?? "",
+          // WHY: team style, no long dashes; the prompt asks, this makes sure (lib/noDashes.ts).
+          text: noLongDashes(msg.content ?? ""),
           // No chart from the model → safety net adds one, unless the what-if
           // view opens (that panel already is the visual).
           charts: charts.length > 0 || whatIf ? charts : fallbackCharts(history),
