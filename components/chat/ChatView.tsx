@@ -104,7 +104,9 @@ export function ChatView() {
     const insights = fetch("/api/insights")
       .then((res) => (res.ok ? res.json() : null))
       .then((json: InsightsResponse | null) => {
-        const help = json?.insights.find((i) => i.kind === "save_help");
+        // WHY by id, not kind: the gentler 10 % "save-tip" is for people who already save;
+        // the opener is only for those who keep (almost) nothing.
+        const help = json?.insights.find((i) => i.id === "save-help");
         if (!help) return;
         // WHY the hook, not the full detail: one fact and one number, then the offer.
         setOpener({
@@ -204,11 +206,17 @@ export function ChatView() {
     return () => window.removeEventListener(CHAT_RESET_EVENT, check);
   }, []);
 
-  async function send(text: string) {
+  /** `context`: a coach message to start from, e.g. an insight opened on Home (?ctx=). */
+  async function send(text: string, context?: string) {
     setSuggestionsOpen(false);
     // WHY: the opener becomes part of the chat once the user answers, so the AI
-    // knows what it offered (and a typed "yes" works).
-    const base = messages.length === 0 && opener ? [opener] : messages;
+    // knows what it offered (and a typed "yes" works). An insight from Home replaces it:
+    // the coach then continues from what the card said, with the same numbers.
+    const base: ChatMessage[] = context
+      ? [...messages, { role: "assistant", text: context }]
+      : messages.length === 0 && opener
+        ? [opener]
+        : messages;
     const next: ChatMessage[] = [...base, { role: "user", text }];
     setMessages(next);
     setLoading(true);
@@ -257,15 +265,18 @@ export function ChatView() {
     }
   }
 
-  // A question handed over from another tab, e.g. /chat?ask=… from the Home loan tab.
+  // A question handed over from another tab, e.g. /chat?ask=… from the Home loan tab,
+  // optionally with ?ctx=… (an insight's title + explanation, from Home's coach insights).
   useEffect(() => {
-    const ask = new URLSearchParams(window.location.search).get("ask");
+    const params = new URLSearchParams(window.location.search);
+    const ask = params.get("ask");
+    const ctx = params.get("ctx") ?? undefined;
     if (!ask) return;
     // WHY a timer + cleanup: React dev mode runs effects twice; the first timer
     // is cancelled, so the question is asked exactly once.
     const id = setTimeout(() => {
       window.history.replaceState(null, "", "/chat"); // a reload shouldn't ask again
-      send(ask);
+      send(ask, ctx);
     }, 0);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on open

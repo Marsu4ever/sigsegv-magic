@@ -488,10 +488,13 @@ const TOOLS: Tool[] = [
   {
     name: "safe_to_spend",
     description:
-      "Answers 'What is safe for me to spend this week?': balance minus fixed costs and a surprise buffer until the next payday, per day and for the requested number of days (default 7). All parts are returned so you can explain them.",
+      "Answers 'What is safe for me to spend this week?': balance minus fixed costs due before the next payday (fixedCosts lists them) and a surprise reserve = what's safe until payday, per day, and for the requested number of days (default 7). safeForRequestedDaysEur only covers coveredDays (the days before payday). shortfallEur > 0 means fixed costs + reserve are more than the balance. nextPayday null = no salary rhythm found (30 days assumed). All parts are returned so you can explain them.",
     properties: { days: { type: "number", description: "Number of days, default 7." } },
     chartable: true,
-    run: (a) => safeToSpend(clampNumber(a.days, 1, 31, 7)),
+    run: (a) =>
+      safeToSpend(clampNumber(a.days, 1, 31, 7)) ?? {
+        note: "No transactions yet, so there is nothing to base a safe-to-spend amount on.",
+      },
   },
   {
     name: "month_progress",

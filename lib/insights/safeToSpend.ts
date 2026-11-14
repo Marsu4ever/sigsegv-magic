@@ -17,7 +17,7 @@
  * calling most of the balance safe to spend. The buffer is still spread evenly: surprise
  * costs have no usual day.
  */
-import type { ChartRow } from "@/lib/types";
+import type { ChartRow, SafeDay, SafeToSpendSummary } from "@/lib/types";
 import { addDays, toDate } from "@/lib/data/dates";
 import { getDataToday, getTransactions, round2 } from "@/lib/data";
 import { irregularBuffer } from "./irregular";
@@ -27,12 +27,22 @@ function daysBetween(a: string, b: string): number {
   return Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86_400_000);
 }
 
-export function safeToSpend(days = 7) {
+/** WHY 30 without a payday: a month is the usual pay cycle. The UI says it's an assumption. */
+const NO_PAYDAY_DAYS = 30;
+
+/**
+ * null when the customer has no transactions (no balance to start from — nothing is made up).
+ * WHY every step is rounded before the next one: the breakdown on Home shows each line, and
+ * they must add up to the cent (balance − fixed − reserve = left; per day × days = the total).
+ */
+export function safeToSpend(days = 7): (SafeToSpendSummary & { rows: ChartRow[] }) | null {
   const today = getDataToday();
   const txs = getTransactions();
-  const balance = txs.length ? txs[txs.length - 1].balanceAfterEur : 0;
+  const latest = txs.at(-1);
+  if (!latest) return null;
+  const balance = round2(latest.balanceAfterEur);
 
-  // Next payday from the salary rhythm.
+  // Next payday from the salary rhythm (needs 2+ salaries to know the gap).
   const salaries = txs.filter((t) => t.category === "Salary" && t.amountEur > 0).map((t) => t.date);
   let nextPayday: string | null = null;
   if (salaries.length >= 2) {
@@ -41,35 +51,60 @@ export function safeToSpend(days = 7) {
     nextPayday = addDays(salaries[salaries.length - 1], usualGap);
     while (nextPayday <= today) nextPayday = addDays(nextPayday, usualGap);
   }
-  const daysToPayday = nextPayday ? daysBetween(today, nextPayday) : 30;
+  const daysToPayday = nextPayday ? daysBetween(today, nextPayday) : NO_PAYDAY_DAYS;
 
   // Bills, subscriptions and savings expected up to and including payday (same list as Home's
   // "Upcoming payments"). WHY including payday: if rent is due that day, be on the safe side.
-  const upcomingFixed = upcomingPayments(daysToPayday).reduce((s, p) => s + p.amountEur, 0);
-  const buffer = (irregularBuffer().averagePerMonthEur * daysToPayday) / 30;
+  const fixedCosts = upcomingPayments(daysToPayday);
+  const fixed = round2(fixedCosts.reduce((sum, p) => sum + p.amountEur, 0));
+  const surpriseAvgPerMonth = round2(irregularBuffer().averagePerMonthEur);
+  const reserve = round2((surpriseAvgPerMonth * daysToPayday) / 30);
 
-  const safeUntilPayday = Math.max(0, balance - upcomingFixed - buffer);
-  const perDay = safeUntilPayday / Math.max(1, daysToPayday);
-  const forDays = perDay * days;
+  const left = round2(balance - fixed - reserve); // can be negative: then it's a shortfall
+  const safeUntilPayday = Math.max(0, left);
+  const shortfall = Math.max(0, round2(-left));
+  const perDay = round2(safeUntilPayday / Math.max(1, daysToPayday));
+  // WHY only the days before payday: after payday there's new money we can't know yet, so
+  // "the next 7 days" never promises more than what's there until payday.
+  const coveredDays = Math.min(days, daysToPayday);
+  const forDays = round2(perDay * coveredDays);
+
+  // Day by day: today first. After payday the day has no allowance (a new budget starts).
+  const soon = upcomingPayments(days);
+  const plan: SafeDay[] = Array.from({ length: days }, (_, i) => {
+    const date = addDays(today, i);
+    return {
+      date,
+      allowanceEur: i < coveredDays ? perDay : null,
+      isPayday: date === nextPayday,
+      payments: soon.filter((p) => p.date === date),
+    };
+  });
 
   const rows: ChartRow[] = [
-    { label: "Balance today", value: round2(balance) },
-    { label: `Fixed costs before payday (est.)`, value: round2(-upcomingFixed) },
-    { label: `Surprise buffer before payday`, value: round2(-buffer) },
-    { label: "Safe until payday", value: round2(safeUntilPayday) },
-    { label: `Safe for ${days} days`, value: round2(forDays) },
+    { label: "Balance today", value: balance },
+    { label: "Fixed costs before payday", value: -fixed },
+    { label: "Surprise reserve before payday", value: -reserve },
+    { label: "Safe until payday", value: safeUntilPayday },
+    { label: `Safe for the next ${coveredDays} days`, value: forDays },
   ];
   return {
     today,
     nextPayday,
     daysToPayday,
-    balanceEur: round2(balance),
-    fixedCostsBeforePaydayEur: round2(upcomingFixed),
-    surpriseBufferEur: round2(buffer),
-    safeUntilPaydayEur: round2(safeUntilPayday),
-    safePerDayEur: round2(perDay),
+    balanceEur: balance,
+    fixedCosts,
+    fixedCostsBeforePaydayEur: fixed,
+    surpriseAvgPerMonthEur: surpriseAvgPerMonth,
+    surpriseBufferEur: reserve,
+    leftAfterCostsEur: left,
+    safeUntilPaydayEur: safeUntilPayday,
+    shortfallEur: shortfall,
+    safePerDayEur: perDay,
     requestedDays: days,
-    safeForRequestedDaysEur: round2(forDays),
+    coveredDays,
+    safeForRequestedDaysEur: forDays,
+    plan,
     rows,
   };
 }
