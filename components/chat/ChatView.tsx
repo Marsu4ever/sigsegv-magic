@@ -11,6 +11,7 @@
  * localStorage later if needed.
  */
 import { useEffect, useRef, useState } from "react";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import type { ChatMessage, ChatResponse, SpendingTarget, WhatIf } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { MessageBubble } from "./MessageBubble";
@@ -35,6 +36,32 @@ const SUGGESTIONS = [
 ];
 
 const WHAT_IF_CHIP_AT = 2;
+
+/** A quiet icon for each suggestion, picked by keywords (unknown → sparkles). */
+function suggestionIcon(text: string): IconName {
+  const q = text.toLowerCase();
+  if (q.includes("spender")) return "user";
+  if (q.includes("slip")) return "coins";
+  if (q.includes("what if")) return "sliders";
+  if (q.includes("safe")) return "shield";
+  if (q.includes("basket")) return "basket";
+  if (q.includes("calendar")) return "calendar";
+  if (q.includes("this month")) return "trend";
+  return "sparkles";
+}
+
+/** The app's little logo: a green rounded tile with a leaf (calm, "growing money"). */
+function LogoMark({ size }: { size: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center bg-accent text-accent-foreground shadow-sm"
+      style={{ width: size, height: size, borderRadius: size * 0.3 }}
+      aria-hidden="true"
+    >
+      <Icon name="leaf" size={Math.round(size * 0.55)} strokeWidth={2.2} />
+    </span>
+  );
+}
 
 /** GET /api/what-if/suggestion response. */
 type WhatIfSuggestion = { target: SpendingTarget };
@@ -177,7 +204,10 @@ export function ChatView() {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
-        <h1 className="font-semibold">Money Coach</h1>
+        <h1 className="flex items-center gap-2 font-semibold">
+          <LogoMark size={26} />
+          Money Coach
+        </h1>
         {mode === "mock" && (
           <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
             mock AI
@@ -187,19 +217,36 @@ export function ChatView() {
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4">
         {messages.length === 0 && (
-          <div className="space-y-3 pt-6 text-center">
-            <p className="text-muted">Ask anything about your money.</p>
-            <div className="flex flex-col items-center gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => send(s)}
-                  className="rounded-full border border-line bg-surface px-3 py-1.5 text-sm"
-                >
-                  {s}
-                </button>
-              ))}
+          // Welcome + suggestions as one tidy list (team call: the old centred
+          // pill stack looked homemade).
+          <div className="mx-auto max-w-md space-y-5 px-1 pt-6">
+            <div className="flex flex-col items-center text-center">
+              <LogoMark size={52} />
+              <h2 className="mt-3 text-xl font-semibold">Hi! I&apos;m your money coach.</h2>
+              <p className="mt-1 text-sm text-muted">
+                Ask anything — I answer with your real numbers.
+              </p>
+            </div>
+
+            <div>
+              <p className="mb-2 px-1 text-xs font-medium text-muted">Try asking</p>
+              <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+                {suggestions.map((s) => (
+                  <li key={s}>
+                    <button
+                      type="button"
+                      onClick={() => send(s)}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-background active:bg-background"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                        <Icon name={suggestionIcon(s)} size={17} />
+                      </span>
+                      <span className="flex-1">{s}</span>
+                      <Icon name="chevron" size={16} className="text-muted" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         )}

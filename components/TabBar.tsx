@@ -5,12 +5,14 @@
  */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
-const TABS = [
-  { href: "/chat", label: "Chat", icon: "💬" },
-  { href: "/week", label: "This week", icon: "📅" },
+// WHY outline icons, not emoji: emoji looked homemade; these match the app.
+const TABS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/chat", label: "Chat", icon: "chat" },
+  { href: "/week", label: "This week", icon: "calendar" },
   // WHY always shown: customers without a mortgage get a friendly empty state.
-  { href: "/loan", label: "Home loan", icon: "🏠" },
+  { href: "/loan", label: "Home loan", icon: "home" },
 ];
 
 export function TabBar() {
@@ -23,11 +25,11 @@ export function TabBar() {
           <Link
             key={tab.href}
             href={tab.href}
-            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-xs ${
+            className={`flex flex-1 flex-col items-center gap-1 pt-2 pb-1.5 text-[11px] ${
               active ? "font-semibold text-accent" : "text-muted"
             }`}
           >
-            <span className="text-lg leading-none">{tab.icon}</span>
+            <Icon name={tab.icon} size={22} strokeWidth={active ? 2.2 : 1.8} />
             {tab.label}
           </Link>
         );

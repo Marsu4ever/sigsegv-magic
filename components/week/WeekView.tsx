@@ -192,6 +192,9 @@ function ByDay({
 }) {
   const max = Math.max(0, ...rows.map((r) => BASKETS.reduce((s, b) => s + r[b], 0)));
   const ticks = niceTicks(max);
+  // Non-breaking space keeps "2000 €" on one line; the axis grows to fit the longest label.
+  const tickLabel = (v: number) => `${v}\u00a0€`;
+  const yAxisWidth = Math.max(36, Math.ceil(tickLabel(ticks[ticks.length - 1]).length * 6.5) + 8);
   return (
     <section className="rounded-2xl p-4 shadow-sm" style={{ background: CARD_TINT }}>
       <h2 className="mb-3 text-sm font-semibold">By day</h2>
@@ -214,10 +217,10 @@ function ByDay({
               ticks={ticks}
               domain={[0, ticks[ticks.length - 1]]}
               tick={{ fontSize: 11, fill: "var(--muted)" }}
-              tickFormatter={(v: number) => `${v} €`}
+              tickFormatter={tickLabel}
               axisLine={false}
               tickLine={false}
-              width={44}
+              width={yAxisWidth}
             />
             {BASKETS.map((b, i) => (
               <Bar
@@ -276,7 +279,12 @@ function TopCategories({
             >
               {/* Medal for the podium, a quiet number after that. */}
               <span className="flex w-8 shrink-0 justify-center text-2xl leading-none">
-                {MEDALS[i] ?? <span className="text-sm font-semibold text-muted">{i + 1}</span>}
+                {MEDALS[i] ?? (
+                  // Same size as a medal, so 4th, 5th… line up and are easy to see.
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-line text-xs font-bold text-foreground/70 tabular-nums">
+                    {i + 1}
+                  </span>
+                )}
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2 text-sm">

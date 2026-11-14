@@ -23,7 +23,10 @@ export function ChartCard({ spec }: { spec: ChartSpec }) {
           <span className="text-sm font-semibold">
             <ChartTitle spec={spec} />
           </span>
-          <span className="shrink-0 text-xs text-muted">Expand ⤢</span>
+          {/* No "Expand" on the calendar (team call): the whole card is tappable. */}
+          {spec.type !== "heatmap" && (
+            <span className="shrink-0 text-xs text-muted">Expand ⤢</span>
+          )}
         </div>
         {/* WHY pointer-events-none: taps go to the card (open full screen),
             not to chart tooltips, which are fiddly on a phone.

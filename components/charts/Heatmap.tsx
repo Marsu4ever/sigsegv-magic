@@ -449,7 +449,7 @@ export function HeatmapPreview({ spec }: { spec: ChartSpec }) {
       {/* WHY the green pill: the month total is the number people look for first. */}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted">
-          {monthName(lastMonth)} · tap to explore other months
+          {monthName(lastMonth)}
         </span>
         <MonthTotal value={total} />
       </div>
