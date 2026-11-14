@@ -45,7 +45,7 @@ export function listDataFiles(): DataFile[] {
   if (fs.existsSync(demoDir)) {
     for (const f of fs.readdirSync(demoDir).sort()) {
       if (/^CUST\d+\.json$/.test(f)) {
-        add(`demo/${f}`, "One demo customer: profile + all their transactions.", true);
+        add(`demo/${f}`, "One demo customer: profile + all their transactions (+ home loan, if any).", true);
       }
     }
   }
@@ -56,7 +56,9 @@ export function listDataFiles(): DataFile[] {
       if (f.endsWith(".csv")) {
         add(
           `raw/${f}`,
-          "Original dataset file (not in git — too big). Open it from your file browser.",
+          f.startsWith("mtg_")
+            ? "Original mortgage file (not in git). Its 12+ demo customers are already in data/demo/."
+            : "Original dataset file (not in git — too big). Open it from your file browser.",
           false,
         );
       }

@@ -7,7 +7,8 @@ import { BASKETS, type Basket } from "@/lib/types";
 import { getCustomerId } from "@/lib/data";
 import { allProfiles, SPENDING_TYPES, type CustomerProfile } from "@/lib/data/profiles";
 import { ageGroupFor } from "@/lib/insights/benchmarks";
-import { CopyButton } from "@/components/dev/CopyButton";
+import { ForPickedCustomer } from "@/components/dev/ForPickedCustomer";
+import { UseCustomerButton } from "@/components/dev/UseCustomerButton";
 import { Code, DevPage, Section } from "@/components/dev/DevPage";
 
 const BASKET_COLOR: Record<Basket, string> = {
@@ -26,7 +27,6 @@ const pct = (n: number) => `${Math.round(n * 100)}%`;
 const eur = (n: number) => `€${n.toLocaleString("fi-FI")}`;
 
 function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
-  const line = `DEMO_CUSTOMER_ID=${p.id}`;
   return (
     <div className={`rounded-lg border p-3 ${current ? "border-accent" : "border-line"}`}>
       <div className="flex items-center justify-between">
@@ -72,20 +72,45 @@ function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
         ))}
       </div>
 
+      {p.mortgage && (
+        <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${
+              p.mortgage.decision === "approved" ? "bg-accent/10 text-accent" : "bg-red-50 text-red-700"
+            }`}
+          >
+            🏠 Home loan {p.mortgage.decision}
+          </span>
+          {p.mortgage.rejectionReason && (
+            <span className="text-muted">{p.mortgage.rejectionReason.replace(/_/g, " ")}</span>
+          )}
+          {p.mortgage.salarySweep && (
+            <span className="text-muted" title="Salary moves out right away — little spending shows">
+              · salary sweep
+            </span>
+          )}
+        </p>
+      )}
+
       <p className="mt-1 text-[11px] text-muted">
         Biggest everyday category: {p.topEveryday} · {p.transactions} transactions · {p.firstDate} →{" "}
         {p.lastDate}
       </p>
 
-      <div className="mt-2 flex items-center gap-2">
-        <Code>{line}</Code>
-        <CopyButton text={line} />
-      </div>
+      {!current && (
+        <div className="mt-2">
+          <UseCustomerButton id={p.id} />
+        </div>
+      )}
     </div>
   );
 }
 
 export default function CustomerProfilesPage() {
+  return <ForPickedCustomer render={ProfilesBody} />;
+}
+
+function ProfilesBody() {
   const profiles = allProfiles();
   const current = getCustomerId();
 
@@ -95,8 +120,9 @@ export default function CustomerProfilesPage() {
       intro={
         <>
           The {profiles.length} real customers prepared in <Code>data/demo/</Code>.{" "}
-          <b>To use one:</b> copy its line into <Code>.env.local</Code> (replace the old{" "}
-          <Code>DEMO_CUSTOMER_ID</Code> line) and restart <Code>npm run dev</Code>.
+          <b>To use one:</b> tap <b>Use in app</b>, or <b>Switch</b> in the dark bar at the top. The
+          choice is per device. Default when nothing is picked: <Code>DEMO_CUSTOMER_ID</Code> in{" "}
+          <Code>.env.local</Code>.
         </>
       }
     >
@@ -122,6 +148,36 @@ export default function CustomerProfilesPage() {
           whole history.
         </p>
       </Section>
+
+      {(() => {
+        // WHY approved first, then by rejection reason: easy to pick one per outcome for the demo.
+        const withLoan = profiles
+          .filter((p) => p.mortgage)
+          .sort((a, b) =>
+            `${a.mortgage!.decision}${a.mortgage!.rejectionReason ?? ""}`.localeCompare(
+              `${b.mortgage!.decision}${b.mortgage!.rejectionReason ?? ""}`,
+            ),
+          );
+        if (withLoan.length === 0) return null;
+        return (
+          <Section
+            title={`🏠 Home loan customers (${withLoan.length})`}
+            note={
+              <>
+                Applied for a mortgage — they have data on the <b>Home loan</b> tab. &ldquo;Salary
+                sweep&rdquo; customers move their pay out right away, so little spending shows: prefer
+                the others for spending questions. Also listed under their spending type below.
+              </>
+            }
+          >
+            <div className="space-y-3">
+              {withLoan.map((p) => (
+                <ProfileCard key={p.id} p={p} current={p.id === current} />
+              ))}
+            </div>
+          </Section>
+        );
+      })()}
 
       {SPENDING_TYPES.map((t) => {
         const group = profiles.filter((p) => p.type === t.type).sort((a, b) => a.age - b.age);

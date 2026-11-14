@@ -17,8 +17,10 @@ import {
 import { BASKET_DESCRIPTIONS, classifyBasket, listMccOverrides } from "@/lib/data/baskets";
 import { listToolNames, runTool } from "@/lib/ai/tools";
 import { compareToPeers } from "@/lib/insights/benchmarks";
+import { getMortgageSummary } from "@/lib/data/mortgage";
 import { ChartCard } from "@/components/charts/ChartCard";
 import { Code, DevPage, Section } from "@/components/dev/DevPage";
+import { ForPickedCustomer } from "@/components/dev/ForPickedCustomer";
 
 const eur = (n: number) => n.toLocaleString("fi-FI", { style: "currency", currency: "EUR" });
 
@@ -41,6 +43,18 @@ const FIELDS: [string, string][] = [
   ["transaction_type", "purchase, salary, housing_payment, utilities_payment, …"],
   ["merchant_id", "Which shop (card purchases only)"],
   ["mcc_code", "Type of shop, e.g. 5411 supermarket, 4121 taxi"],
+];
+
+/** The mortgage files (data/raw/mtg_*.csv) — 200 of the 5,100 customers applied. */
+const MORTGAGE_FILES: [string, string][] = [
+  [
+    "mtg_tx_customer_link_and_final_mtg_infio.csv",
+    "One row per application: links the mortgage id (C0025) to our customer id (CUST03878) + final decision, rejection reason, price, loan, equity, collateral, required monthly income, loan-to-value. 150 approved, 50 rejected.",
+  ],
+  [
+    "mtg_negotiation_history.csv",
+    "11–25 events per application (3,452 in total): application started → homes added → loan calculated → costs recorded → collateral valued → decision. Each has a plain-English note.",
+  ],
 ];
 
 /** Pick ~8 recent transactions that show the variety in the data. */
@@ -245,7 +259,12 @@ const CHART_EXAMPLES: { what: string; args: Record<string, unknown> }[] = [
 ];
 
 export default function DataPage() {
+  return <ForPickedCustomer render={DataBody} />;
+}
+
+function DataBody() {
   const customer = getCustomer();
+  const mortgage = getMortgageSummary();
   const all = getTransactions();
   const samples = sampleTransactions(all);
   const categories = getDatasetCategories();
@@ -263,8 +282,8 @@ export default function DataPage() {
       intro={
         <>
           Showing demo customer <b>{getCustomerId()}</b> (age {customer.age}, {all.length}{" "}
-          transactions, {all[0]?.date} → {getDataToday()}). Change it with{" "}
-          <Code>DEMO_CUSTOMER_ID</Code> in <Code>.env.local</Code> — see{" "}
+          transactions, {all[0]?.date} → {getDataToday()}). Change it with <b>Switch</b> in the
+          dark bar at the top, or on{" "}
           <Link className="text-accent underline" href="/customer_profiles">
             customer profiles
           </Link>
@@ -525,6 +544,45 @@ export default function DataPage() {
               </tbody>
             </table>
           </>
+        )}
+      </Section>
+
+      {/* ── 6. Home loan ────────────────────────────────────────────── */}
+      <Section
+        title="6. Home loan (mortgage) data"
+        note={
+          <>
+            Shown on the <b>Home loan</b> tab and via the AI tool <Code>mortgage_status</Code>. Code:{" "}
+            <Code>lib/data/mortgage.ts</Code>. Pick a customer with a loan on{" "}
+            <Link className="text-accent underline" href="/customer_profiles">
+              Customer profiles
+            </Link>
+            .
+          </>
+        }
+      >
+        <ul className="space-y-1.5 text-xs">
+          {MORTGAGE_FILES.map(([f, m]) => (
+            <li key={f}>
+              <Code>{f}</Code> — {m}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted">
+          ⚠️ The bank&apos;s decision can&apos;t be worked out from the transactions (approved and
+          rejected customers earn about the same vs. the &ldquo;required income&rdquo;). We show the
+          decision and reason as recorded and never make up our own. Mortgage payments don&apos;t
+          appear in the transactions either.
+        </p>
+        {mortgage ? (
+          <p className="mt-2 text-sm">
+            This customer: application <b>{mortgage.mortgageId}</b>, <b>{mortgage.decision}</b>
+            {mortgage.rejectionReason && ` (${mortgage.rejectionReason})`} · loan{" "}
+            {eur(mortgage.loanEur)} · own money {eur(mortgage.equityEur)} ·{" "}
+            {mortgage.timeline.length} timeline steps.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted">This customer has no mortgage application.</p>
         )}
       </Section>
     </DevPage>

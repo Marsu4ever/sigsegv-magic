@@ -1,0 +1,5 @@
+# Keep big data files out of AI context (Cursor). Same rule as .claude/settings.json and CLAUDE.md.
+# data/raw/ = 346 MB of CSVs; each demo customer file = ~80–350 KB (tens of thousands of tokens).
+data/raw/
+data/demo/CUST*.json
+data/demo/MOCK.json

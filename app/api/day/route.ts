@@ -5,6 +5,7 @@
 import { connection } from "next/server";
 import type { DaySpending } from "@/lib/types";
 import { getTransactions, isIncome, isSpending, merchantType, round2, spentEur } from "@/lib/data";
+import { withPickedCustomer } from "@/lib/data/request";
 
 export async function GET(request: Request) {
   await connection();
@@ -12,7 +13,8 @@ export async function GET(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return Response.json({ error: "date must be YYYY-MM-DD" }, { status: 400 });
   }
-  const txs = getTransactions({ from: date, to: date });
+  // WHY wrapped: show the customer picked in the app's DEMO bar (lib/data/request.ts).
+  const txs = await withPickedCustomer(() => getTransactions({ from: date, to: date }));
   const spending = txs.filter(isSpending);
   const body: DaySpending = {
     date,
