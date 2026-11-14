@@ -8,6 +8,7 @@ import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartFullscreen } from "./ChartFullscreen";
 import { ChartTitle } from "./ChartTitle";
+import { Icon } from "@/components/ui/Icon";
 
 export function ChartCard({ spec }: { spec: ChartSpec }) {
   const [open, setOpen] = useState(false);
@@ -25,7 +26,9 @@ export function ChartCard({ spec }: { spec: ChartSpec }) {
           </span>
           {/* No "Expand" on the calendar (team call): the whole card is tappable. */}
           {spec.type !== "heatmap" && (
-            <span className="shrink-0 text-xs text-muted">Expand ⤢</span>
+            <span className="flex shrink-0 items-center gap-1 text-xs text-muted">
+              Expand <Icon name="expand" size={13} />
+            </span>
           )}
         </div>
         {/* WHY pointer-events-none: taps go to the card (open full screen),

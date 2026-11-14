@@ -49,8 +49,13 @@ function InsightSheet({ insight, onClose }: { insight: Insight; onClose: () => v
             <p className="text-xs font-medium text-muted">{KIND[insight.kind].label}</p>
             <h2 className="mt-0.5 text-lg font-semibold leading-snug">{insight.title}</h2>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="px-2 text-2xl leading-none text-muted">
-            ×
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="-mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+          >
+            <Icon name="close" size={20} />
           </button>
         </div>
 

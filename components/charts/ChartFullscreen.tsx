@@ -8,6 +8,7 @@ import { useEffect } from "react";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartTitle } from "./ChartTitle";
+import { Icon } from "@/components/ui/Icon";
 
 export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: () => void }) {
   // Close with the Escape key (handy when testing on a laptop).
@@ -40,10 +41,10 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
           <button
             type="button"
             onClick={onClose}
-            className="px-2 text-xl text-muted"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
             aria-label="Close"
           >
-            ✕
+            <Icon name="close" size={20} />
           </button>
         </header>
         <div className="flex-1 overflow-y-auto p-4">

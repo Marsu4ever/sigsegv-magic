@@ -124,10 +124,12 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   // same way from tone2 (e.g. what_if's "20% less" in green), otherwise grey.
   const uniformTone = (tones: Set<ChartRow["tone"]>) => tones.size === 1 && toneColor([...tones][0]);
   const mainColor = uniformTone(new Set(spec.rows.map((r) => r.tone))) || "var(--accent)";
-  const SECOND_COLOR = uniformTone(new Set(spec.rows.map((r) => r.tone2))) || "#a9b1a9";
-  const tiltLabels =
-    !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
-  const height = compact ? 160 : 340;
+  const SECOND_COLOR = uniformTone(new Set(spec.rows.map((r) => r.tone2))) || "var(--chart-muted)";
+  // WHY sideways bars for many word labels (e.g. you vs your age group, 10+ categories): upright
+  // bars made the names overlap and the bars tiny on a phone. Names on the left read like a list.
+  const sideways = spec.type === "bar" && data.length > 5 && data.some((d) => d.label.length > 6);
+  const rowHeight = (twoSeries ? 26 : 20) + (compact ? 0 : 8);
+  const height = sideways ? data.length * rowHeight + 32 : compact ? 160 : 340;
   // WHY styled: Recharts' default tooltip is a white box, which glares in dark mode.
   const tooltip = (
     <Tooltip
@@ -186,11 +188,39 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
                 />
               )}
             </LineChart>
+          ) : sideways ? (
+            <BarChart
+              accessibilityLayer={false}
+              data={data}
+              layout="vertical"
+              margin={{ top: 0, right: 8, bottom: 0, left: 0 }}
+              barCategoryGap={twoSeries ? "18%" : "22%"}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "var(--muted)" }} />
+              <YAxis
+                type="category"
+                dataKey="label"
+                width={96}
+                interval={0}
+                tick={{ fontSize: 11, fill: "var(--foreground)" }}
+                tickLine={false}
+              />
+              {tooltip}
+              {twoSeries ? (
+                <>
+                  <Bar dataKey="value" name={name1} fill={mainColor} radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="value2" name={name2} fill={SECOND_COLOR} radius={[0, 4, 4, 0]} />
+                </>
+              ) : (
+                <Bar dataKey="value" radius={[0, 4, 4, 0]} />
+              )}
+            </BarChart>
           ) : (
             <BarChart
               accessibilityLayer={false}
               data={data}
-              margin={{ top: 8, right: 8, bottom: 0, left: tiltLabels ? 24 : 0 }}
+              margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="var(--line)" vertical={false} />
               <XAxis
@@ -198,8 +228,6 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
                 tick={{ fontSize: 11 }}
                 // WHY: show every label only when they fit (≤ 12 bars).
                 interval={compact || data.length > 12 ? "preserveStartEnd" : 0}
-                // WHY: many word labels (categories) overlap — tilt them in full screen.
-                {...(tiltLabels ? { angle: -35, textAnchor: "end", height: 70 } : {})}
               />
               <YAxis tick={{ fontSize: 11 }} width={40} />
               {tooltip}

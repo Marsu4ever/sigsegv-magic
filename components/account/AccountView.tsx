@@ -254,7 +254,7 @@ export function AccountView() {
                   onClick={() => goToMonth(-1)}
                   disabled={!canGoBack || loadingMonth}
                   aria-label="Previous month"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
                 >
                   ‹
                 </button>
@@ -272,7 +272,7 @@ export function AccountView() {
                   onClick={() => goToMonth(1)}
                   disabled={!canGoForward || loadingMonth}
                   aria-label="Next month"
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-accent disabled:opacity-25"
                 >
                   ›
                 </button>

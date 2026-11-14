@@ -55,15 +55,15 @@ function shiftMonth(m: string, n: number) {
 }
 
 const eur = (n: number) => n.toLocaleString("fi-FI", { style: "currency", currency: "EUR" });
-const LAST_MONTH_COLOR = "#9aa39a";
-const AVERAGE_COLOR = "#7ab8e8"; // light blue
+const LAST_MONTH_COLOR = "var(--chart-muted)"; // theme grey (app/globals.css)
+const AVERAGE_COLOR = "var(--chart-average)"; // light blue
 const DRAW_MS = 1400;
 
 type SeriesKey = "actual" | "last" | "average";
 const SERIES_COLOR: Record<SeriesKey, string> = {
   actual: "var(--accent)",
-  last: "#9aa39a",
-  average: "#7ab8e8",
+  last: LAST_MONTH_COLOR,
+  average: AVERAGE_COLOR,
 };
 
 export function CumulativeChart({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
