@@ -23,6 +23,7 @@ import {
   pct,
 } from "./labels";
 import { DevHeaderButton } from "@/components/DevButton";
+import { SkeletonCard, SkeletonGroup } from "@/components/ui/Skeleton";
 
 /** Opens the chat and asks this question straight away (see ChatView). */
 const askUrl = (q: string) => `/chat?ask=${encodeURIComponent(q)}`;
@@ -281,7 +282,13 @@ export function MortgageView() {
 
       <div className="space-y-4 p-4">
         {error && <p className="text-sm text-danger">⚠️ {error}</p>}
-        {data === undefined && !error && <p className="text-sm text-muted">Loading…</p>}
+        {data === undefined && !error && (
+          <SkeletonGroup className="space-y-4">
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={3} />
+            <SkeletonCard lines={2} />
+          </SkeletonGroup>
+        )}
         {data === null && <NoMortgage />}
         {data && (
           <>

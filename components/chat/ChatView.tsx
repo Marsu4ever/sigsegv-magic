@@ -12,6 +12,7 @@
  */
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { SkeletonBubble, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 import type { ChatMessage, ChatResponse, SpendingTarget, InsightsResponse } from "@/lib/types";
 import { WhatIfPanel } from "@/components/whatif/WhatIfPanel";
 import { CHAT_RESET_EVENT, getChatResetCount } from "@/lib/chatReset";
@@ -96,30 +97,34 @@ export function ChatView() {
   // WHY: someone who keeps little of their income may not know it. The coach says so
   // first, before they ask (lib/insights/proactive.ts, "save_help").
   const [opener, setOpener] = useState<ChatMessage | null>(null);
+  // WHY wait for both before showing the start screen (skeleton meanwhile): they used to
+  // pop in one by one after the page had drawn, pushing everything down.
+  const [startReady, setStartReady] = useState(false);
   useEffect(() => {
-    fetch("/api/insights")
+    const insights = fetch("/api/insights")
       .then((res) => (res.ok ? res.json() : null))
       .then((json: InsightsResponse | null) => {
         const help = json?.insights.find((i) => i.kind === "save_help");
         if (!help) return;
+        // WHY the hook, not the full detail: one fact and one number, then the offer.
         setOpener({
           role: "assistant",
-          text: `${help.title}. ${help.detail} Want to see how you could save?\n[[${help.ask}]]`,
+          text: `${help.title}. ${help.hook}. Want to see how?\n[[${help.ask}]]`,
         });
       })
       .catch((err) => console.error("[insights]", err));
-  }, []);
 
-  // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
-  // On failure the chip is just left out — the other suggestions still work.
-  useEffect(() => {
-    fetch("/api/what-if/suggestion")
+    // WHY fetch, not hard-coded: X depends on the customer's data (server-only lib/insights).
+    // On failure the chip is just left out — the other suggestions still work.
+    const chip = fetch("/api/what-if/suggestion")
       .then(async (res) => {
         const json = await res.json();
         if (!res.ok) throw new Error(json.detail || json.error || `HTTP ${res.status}`);
         setWhatIfChip(whatIfChipText(json as WhatIfSuggestion));
       })
       .catch((err) => console.error("[what-if suggestion]", err)); // browser DevTools console
+
+    Promise.allSettled([insights, chip]).then(() => setStartReady(true));
   }, []);
 
   const suggestions = whatIfChip
@@ -288,7 +293,6 @@ export function ChatView() {
           // Welcome + suggestions as one tidy list (team call: the old centred
           // pill stack looked homemade).
           <div className="mx-auto max-w-md space-y-5 px-1 pt-6">
-            {opener && <MessageBubble message={opener} onFollowUp={send} />}
             <div className="flex flex-col items-center text-center">
               <LogoMark size={52} />
               <h2 className="mt-3 text-xl font-semibold">Hi! I&apos;m your money coach.</h2>
@@ -297,25 +301,34 @@ export function ChatView() {
               </p>
             </div>
 
+            {/* WHY below the greeting: the coach says hi first, then what it noticed. */}
+            {opener && <MessageBubble message={opener} onFollowUp={send} />}
+
             <div>
               <p className="mb-2 px-1 text-xs font-medium text-muted">Try asking</p>
-              <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-                {suggestions.map((s) => (
-                  <li key={s}>
-                    <button
-                      type="button"
-                      onClick={() => send(s)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-background active:bg-background"
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                        <Icon name={suggestionIcon(s)} size={17} />
-                      </span>
-                      <span className="flex-1">{s}</span>
-                      <Icon name="chevron" size={16} className="text-muted" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {!startReady ? (
+                <SkeletonGroup className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+                  <SkeletonRows rows={SUGGESTIONS.length + 1} />
+                </SkeletonGroup>
+              ) : (
+                <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
+                  {suggestions.map((s) => (
+                    <li key={s}>
+                      <button
+                        type="button"
+                        onClick={() => send(s)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-background active:bg-background"
+                      >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                          <Icon name={suggestionIcon(s)} size={17} />
+                        </span>
+                        <span className="flex-1">{s}</span>
+                        <Icon name="chevron" size={16} className="text-muted" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         )}
@@ -339,7 +352,14 @@ export function ChatView() {
             />
           </Fragment>
         ))}
-        {loading && <p className="text-sm text-muted">Thinking…{elapsed >= 3 && ` ${elapsed}s`}</p>}
+        {/* WHY a bubble skeleton: shows where the answer will appear. The seconds stay
+            (after 3 s) so a slow model is visibly still working. */}
+        {loading && (
+          <SkeletonGroup className="space-y-1">
+            <SkeletonBubble />
+            {elapsed >= 3 && <p className="px-1 text-xs text-muted">Thinking… {elapsed}s</p>}
+          </SkeletonGroup>
+        )}
         <div ref={bottomRef} />
       </div>
 
