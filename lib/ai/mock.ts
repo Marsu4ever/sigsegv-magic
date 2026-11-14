@@ -31,6 +31,9 @@ function chart(
 const eur = (n: number) => `€${Number(n).toFixed(2)}`;
 /** Big amounts (home loans) without cents: 285500 → "€285,500". */
 const eur0 = (n: number) => `€${Math.round(n).toLocaleString("en")}`;
+/** Colored amounts in the chat (components/chat/MoneyText.tsx): green = money in, red = out. */
+const plus = (n: number) => `{+${eur(n)}}`;
+const minus = (n: number) => `{-${eur(n)}}`;
 const has = (q: string, ...words: string[]) => words.some((w) => q.includes(w));
 
 export function mockReply(history: ChatMessage[]): ChatMessage {
@@ -66,9 +69,9 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const m = data("month_progress");
     const diff = m.differenceVsLastMonthSoFarEur;
     return reply(
-      `So far this month you've spent ${eur(m.spentSoFarEur)} — ${eur(Math.abs(diff))} ${diff >= 0 ? "more" : "less"} ` +
-        `than by the same day last month. At this pace the month ends around ${eur(m.projectedMonthTotalEur)} ` +
-        `(last month: ${eur(m.lastMonthTotalEur)}).`,
+      `So far this month you've spent ${minus(m.spentSoFarEur)} — ${diff >= 0 ? minus(diff) : plus(-diff)} ${diff >= 0 ? "more" : "less"} ` +
+        `than by the same day last month. At this pace the month ends around ${minus(m.projectedMonthTotalEur)} ` +
+        `(last month: ${minus(m.lastMonthTotalEur)}).`,
       chart("cumulative", "This month so far", "month_progress"),
     );
   }
@@ -87,7 +90,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const p = data("spender_profile");
     return reply(
       `You're a "${p.type}" (${p.typeRule}). You keep ${Math.round(p.keptShare * 100)}% of your income. ` +
-        `Small purchases under €${p.smallPurchasesLast90Days.maxEur} add up to ${eur(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
+        `Small purchases under €${p.smallPurchasesLast90Days.maxEur} add up to ${minus(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
       chart("pie", "Your spending by basket (%)", "spender_profile"),
     );
   }
@@ -95,7 +98,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   if (has(q, "safe to spend", "safe")) {
     const s = data("safe_to_spend", { days: 7 });
     return reply(
-      `About ${eur(s.safeForRequestedDaysEur)} is safe to spend in the next 7 days. Next payday ≈ ${s.nextPayday}.`,
+      `About ${plus(s.safeForRequestedDaysEur)} is safe to spend in the next 7 days. Next payday ≈ ${s.nextPayday}.`,
       chart("table", "Safe to spend", "safe_to_spend", { days: 7 }),
     );
   }
@@ -109,7 +112,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     };
     const w = data("what_if", args);
     return reply(
-      `Cutting ${w.what} by ${pct}% would save about ${eur(w.savingPerMonthEur)} a month — ${eur(w.savingPerYearEur)} a year.`,
+      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month — ${plus(w.savingPerYearEur)} a year.`,
       chart("bar", `${w.what}: now vs after −${pct}%`, "what_if", args),
     );
   }
@@ -118,7 +121,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const l = data("everyday_leaks", { period: "last_90_days" });
     return reply(
       `Small purchases (≤ €${l.smallPurchases.maxEur}) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
-        `${eur(l.smallPurchases.perMonthEur)} a month — ${eur(l.smallPurchases.perYearEur)} a year.`,
+        `${minus(l.smallPurchases.perMonthEur)} a month — ${minus(l.smallPurchases.perYearEur)} a year.`,
       chart("leaks", "Where my money slips away 💸", "everyday_leaks", { period: "last_90_days" }),
     );
   }
@@ -134,8 +137,8 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   if (has(q, "surprise", "irregular", "buffer", "emergency")) {
     const b = data("irregular_buffer");
     return reply(
-      `Surprise costs average ${eur(b.averagePerMonthEur)} a month; the worst month was ${b.worstMonth?.month} ` +
-        `(${eur(b.worstMonth?.eur ?? 0)}). A buffer of about €${b.suggestion.emergencyBufferEur} would cover that.`,
+      `Surprise costs average ${minus(b.averagePerMonthEur)} a month; the worst month was ${b.worstMonth?.month} ` +
+        `(${minus(b.worstMonth?.eur ?? 0)}). A buffer of about €${b.suggestion.emergencyBufferEur} would cover that.`,
       chart("bar", "Surprise costs per month", "irregular_buffer"),
     );
   }
@@ -151,7 +154,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
   if (has(q, "income", "earn", "keep", "salary")) {
     const i = data("income_summary", { period: "last_month" });
     return reply(
-      `Last month you earned ${eur(i.incomeEur)}, spent ${eur(i.spendingEur)} and kept ${eur(i.keptEur)}.`,
+      `Last month you earned ${plus(i.incomeEur)}, spent ${minus(i.spendingEur)} and kept ${i.keptEur >= 0 ? plus(i.keptEur) : minus(-i.keptEur)}.`,
       chart("bar", "Last month: income vs spending", "income_summary", { period: "last_month" }),
     );
   }
@@ -191,8 +194,8 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const rows = c?.rows ?? [];
     const total = rows.reduce((s, r) => s + r.value, 0);
     return reply(
-      `In the last 90 days you've spent ${eur(total)}: ` +
-        rows.map((r) => `${eur(r.value)} ${r.label.toLowerCase()}`).join(", ") +
+      `In the last 90 days you've spent ${minus(total)}: ` +
+        rows.map((r) => `${minus(r.value)} ${r.label.toLowerCase()}`).join(", ") +
         ". Tap a category to see what's inside it.",
       c,
     );
@@ -214,7 +217,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
       category,
     });
     const total = (c?.rows ?? []).reduce((s, r) => s + r.value, 0);
-    return reply(`Last month you spent ${eur(total)} on ${category}.`, c);
+    return reply(`Last month you spent ${minus(total)} on ${category}.`, c);
   }
 
   if (q.includes("week")) {
@@ -223,7 +226,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
       period: "last_7_days",
     });
     const total = (c?.rows ?? []).reduce((s, r) => s + r.value, 0);
-    return reply(`In the last 7 days you've spent ${eur(total)}.`, c);
+    return reply(`In the last 7 days you've spent ${minus(total)}.`, c);
   }
 
   return reply(
