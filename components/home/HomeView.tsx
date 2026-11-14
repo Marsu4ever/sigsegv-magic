@@ -10,7 +10,7 @@
  *   2. safe to spend         → /api/home      (= the coach's safe_to_spend tool; the pace bar
  *                                              also uses /api/week's last-7-days total)
  *   (saving goal strip       → /api/goal      only when a goal is set; GoalStrip, see DECISIONS #60c)
- *   3. coach insights        → /api/insights  (InsightCards: one-line hooks, details on tap)
+ *   3. coach insights        → /api/insights  (InsightCards; shown right after 1, before 2)
  *   4. spending breakdown    → /api/spending  (the month in the 3 baskets, expandable; the
  *                                              last 7 days are on /week)
  *   5. upcoming payments     → /api/home      (predicted from past payments, next month;
@@ -114,6 +114,10 @@ export function HomeView() {
           </SkeletonGroup>
         )}
 
+        {/* Coach insights right under the account overview (net cash flow), so what the coach
+            noticed sits next to the numbers it's about (user request). */}
+        <InsightCards title="Coach insights" />
+
         {/* 2. Safe to spend */}
         {extras.error ? (
           <SectionError text={extras.error} />
@@ -134,9 +138,6 @@ export function HomeView() {
 
         {/* Saving goal: a section like the rest, only when a goal is set; taps through to /week (DECISIONS.md #60c) */}
         <GoalStrip view={goal} />
-
-        {/* 3. Coach insights (hides itself when there's nothing to say) */}
-        <InsightCards title="Coach insights" />
 
         {/* 4. Spending breakdown: the month in the 3 baskets (the 7-day view is one tap away) */}
         <CollapsibleSection
