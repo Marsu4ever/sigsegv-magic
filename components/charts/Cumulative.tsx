@@ -117,7 +117,7 @@ export function CumulativeChart({ spec, compact }: { spec: ChartSpec; compact: b
           </button>
         </div>
       )}
-      {error && <p className="text-sm text-red-600">⚠️ Couldn&apos;t load that month: {error}</p>}
+      {error && <p className="text-sm text-danger">⚠️ Couldn&apos;t load that month: {error}</p>}
       {/* WHY key={month}: a new month starts fresh (line draws again, day resets). */}
       <MonthChart key={nav?.shown ?? "spec"} spec={view} compact={compact} />
     </div>
@@ -312,7 +312,7 @@ function MonthChart({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
                 y={sel.value}
                 r={5}
                 fill="var(--accent)"
-                stroke="white"
+                stroke="var(--surface)"
                 strokeWidth={2}
               />
             )}
@@ -322,7 +322,7 @@ function MonthChart({ spec, compact }: { spec: ChartSpec; compact: boolean }) {
                 y={spec.rows[lastIdx].value}
                 r={4}
                 fill="var(--accent)"
-                stroke="white"
+                stroke="var(--surface)"
                 label={
                   compact
                     ? undefined
@@ -451,7 +451,7 @@ function Expenses({
       // WHY per-slice props: Recharts copies them onto the slice, so the tapped
       // one stays bright and gets an outline while the rest fade.
       fillOpacity: group && group !== label ? 0.3 : 1,
-      stroke: group === label ? "var(--foreground)" : "white",
+      stroke: group === label ? "var(--foreground)" : "var(--surface)",
       strokeWidth: group === label ? 2 : 1,
     }));
 

@@ -191,14 +191,26 @@ export function categoryColor(category: string): string {
  * A small rounded tile with the category's icon: white card normally, solid
  * colour with a white icon when `active` (the opened category).
  */
-export function CategoryTile({ category, active }: { category: string; active?: boolean }) {
+export function CategoryTile({
+  category,
+  active,
+  size = 28,
+}: {
+  category: string;
+  active?: boolean;
+  size?: number; // px, the tile; the icon scales with it
+}) {
   const color = categoryColor(category);
   return (
     <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors"
+      className="flex shrink-0 items-center justify-center rounded-lg transition-colors"
       style={{
-        // White card with a soft shadow (team call); solid colour when opened.
-        background: active ? color : "white",
+        width: size,
+        height: size,
+        borderRadius: size >= 36 ? 12 : 8,
+        // Card-coloured chip with a soft shadow (team call); solid colour when opened.
+        // var(--surface) = white in light mode, dark in dark mode.
+        background: active ? color : "var(--surface)",
         boxShadow: active
           ? `0 1px 3px color-mix(in srgb, ${color} 45%, transparent)`
           : "0 1px 2px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)",
@@ -206,7 +218,7 @@ export function CategoryTile({ category, active }: { category: string; active?: 
     >
       <CategoryIcon
         category={category}
-        size={16}
+        size={Math.round(size * 0.56)}
         strokeWidth={2.4}
         color={active ? "white" : color}
       />

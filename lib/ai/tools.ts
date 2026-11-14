@@ -65,6 +65,8 @@ type ToolOutput = Record<string, unknown> & {
   monthNav?: ChartSpec["monthNav"];
   /** Basket tree for the "baskets" chart (ChartSpec.baskets). */
   basketTree?: ChartSpec["baskets"];
+  /** Screen data for the "leaks" chart (ChartSpec.leaks). */
+  view?: ChartSpec["leaks"];
   periodLabel?: string;
 };
 
@@ -475,7 +477,16 @@ const TOOLS: Tool[] = [
 ];
 
 const BY_NAME = new Map(TOOLS.map((t) => [t.name, t]));
-const CHART_TYPES = ["bar", "line", "pie", "table", "heatmap", "cumulative", "baskets"] as const;
+const CHART_TYPES = [
+  "bar",
+  "line",
+  "pie",
+  "table",
+  "heatmap",
+  "cumulative",
+  "baskets",
+  "leaks",
+] as const;
 const CHARTABLE = TOOLS.filter((t) => t.chartable).map((t) => t.name);
 
 /** Every argument any chartable tool accepts — show_chart's data_args schema. */
@@ -509,7 +520,9 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         "'cumulative' = month so far vs last month with a projection to month end (data_tool month_progress, " +
         "optional month 'YYYY-MM'). " +
         "'baskets' = the 3 baskets with their categories; the user can tap a category to see what's inside " +
-        "(data_tool basket_details, period).",
+        "(data_tool basket_details, period). " +
+        "'leaks' = where money slips away: yearly cost of small purchases, habit cards with 'skip one' savings " +
+        "and a jar of every small purchase (data_tool everyday_leaks).",
       parameters: {
         type: "object",
         properties: {
@@ -545,9 +558,11 @@ const MAX_ROWS_FOR_LLM = 60;
 function forLlm(full: ToolOutput): string {
   // WHY drop chartList: it's for the screen; the LLM already gets the same data.
   // basketTree is the same data as `baskets`, kept for the screen only.
-  const { chartList: _unused, basketTree: _sameAsBaskets, ...out } = full;
+  // `view` is the "leaks" chart's screen data (every small purchase etc.).
+  const { chartList: _unused, basketTree: _sameAsBaskets, view: _screenOnly, ...out } = full;
   void _unused;
   void _sameAsBaskets;
+  void _screenOnly;
   // WHY rename value/value2 to the series names ("You" / "Typical age 26-35"):
   // with bare value/value2 the model mixed up which number was whose.
   const names = out.seriesNames;
@@ -600,11 +615,15 @@ export function runTool(name: string, args: Args): ToolResult {
           ? BY_NAME.get("month_progress")!.run(dataArgs as Args)
           : type === "baskets"
             ? BY_NAME.get("basket_details")!.run(dataArgs as Args)
-            : dataTool.run(dataArgs as Args);
+            : type === "leaks"
+              ? BY_NAME.get("everyday_leaks")!.run(dataArgs as Args)
+              : dataTool.run(dataArgs as Args);
     const rows = out.rows ?? [];
     const chart: ChartSpec = {
       type,
-      title: optString(args.title) ?? "Your spending",
+      // WHY fixed for "leaks": the team picked this title (shown in italics).
+      title:
+        type === "leaks" ? "Where my money slips away 💸" : (optString(args.title) ?? "Your spending"),
       unit: out.unit ?? "€",
       rows,
       ...(out.seriesNames ? { seriesNames: out.seriesNames } : {}),
@@ -612,6 +631,7 @@ export function runTool(name: string, args: Args): ToolResult {
       ...(out.chartList ? { items: out.chartList } : {}),
       ...(out.monthNav ? { monthNav: out.monthNav } : {}),
       ...(out.basketTree ? { baskets: out.basketTree } : {}),
+      ...(type === "leaks" && out.view ? { leaks: out.view } : {}),
       ...(out.periodLabel ? { periodLabel: out.periodLabel } : {}),
     };
     return { content: JSON.stringify({ shown: true, rows: rows.length }), chart };

@@ -51,7 +51,7 @@ Use the baskets to explain WHY a number matters, not as jargon.
 - Time words: "this week" → period last_7_days (the data ends mid-week). "This month", "last month" → those periods. A named month or date → exact from/to dates (YYYY-MM-DD). "Lately" → last_30_days. "Usually / on average" → last_90_days.
 - Prefer these ready-made tools; each answers the question in one step:
   - "What kind of spender am I?" → spender_profile
-  - "Where does my money go / slip away?", small purchases → everyday_leaks
+  - "Where does my money slip away?", small purchases, habits → show_chart type "leaks" (data_tool everyday_leaks)
   - "How much could I save if I cut X?" → what_if
   - "What's safe to spend?" / "Can I afford X this week?" → safe_to_spend
   - Bills, subscriptions, fixed costs → recurring_payments

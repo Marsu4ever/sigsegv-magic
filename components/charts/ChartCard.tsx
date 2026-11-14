@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { ChartSpec } from "@/lib/types";
 import { ChartRenderer } from "./ChartRenderer";
 import { ChartFullscreen } from "./ChartFullscreen";
+import { ChartTitle } from "./ChartTitle";
 
 export function ChartCard({ spec }: { spec: ChartSpec }) {
   const [open, setOpen] = useState(false);
@@ -19,7 +20,9 @@ export function ChartCard({ spec }: { spec: ChartSpec }) {
         aria-label={`Open chart: ${spec.title}`}
       >
         <div className="mb-1 flex items-start justify-between gap-2">
-          <span className="text-sm font-semibold">{spec.title}</span>
+          <span className="text-sm font-semibold">
+            <ChartTitle spec={spec} />
+          </span>
           <span className="shrink-0 text-xs text-muted">Expand ⤢</span>
         </div>
         {/* WHY pointer-events-none: taps go to the card (open full screen),

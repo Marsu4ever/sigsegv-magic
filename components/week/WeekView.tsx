@@ -50,7 +50,7 @@ export function WeekView() {
       </header>
 
       <div className="space-y-4 p-4">
-        {error && <p className="text-sm text-red-600">⚠️ {error}</p>}
+        {error && <p className="text-sm text-danger">⚠️ {error}</p>}
         {!data && !error && <p className="text-sm text-muted">Loading…</p>}
 
         {data && (

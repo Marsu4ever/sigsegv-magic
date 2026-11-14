@@ -6,10 +6,12 @@
  * WHY dark and separate from the app's own headers: it's a demo control, not part
  * of the bank app — the audience should see it isn't a real feature.
  * Hide it for a "clean" demo: SHOW_CUSTOMER_SWITCHER = false (pick on /customer_profiles instead).
+ * The bar also holds the light/dark toggle; without the bar the app follows the phone's setting.
  */
 import { useEffect, useState } from "react";
 import type { DemoCustomerOption, DemoCustomersResponse } from "@/lib/types";
 import { switchDemoCustomer } from "@/lib/demoCustomer";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const SHOW_CUSTOMER_SWITCHER = true;
 
@@ -22,7 +24,7 @@ function LoanBadge({ m }: { m: NonNullable<DemoCustomerOption["mortgage"]> }) {
       Approved
     </span>
   ) : (
-    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+    <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-semibold text-danger">
       Rejected
     </span>
   );
@@ -161,27 +163,30 @@ export function CustomerSwitcher() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => data && setOpen(true)}
-        className="flex w-full items-center justify-between gap-2 bg-foreground px-4 py-1.5 text-xs text-background"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="rounded bg-background/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
-            DEMO
+      <div className="flex items-center bg-foreground pr-3 text-xs text-background">
+        <button
+          type="button"
+          onClick={() => data && setOpen(true)}
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 py-1.5 pl-4 pr-2"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="rounded bg-background/15 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+              DEMO
+            </span>
+            <span className="truncate">
+              {!data
+                ? "Loading customer…"
+                : current
+                  ? `${current.id} · ${current.age} y${current.mortgage ? " · 🏠 home loan" : ""}`
+                  : data.current === "MOCK"
+                    ? "MOCK · fake data"
+                    : data.current}
+            </span>
           </span>
-          <span className="truncate">
-            {!data
-              ? "Loading customer…"
-              : current
-                ? `${current.id} · ${current.age} y${current.mortgage ? " · 🏠 home loan" : ""}`
-                : data.current === "MOCK"
-                  ? "MOCK · fake data"
-                  : data.current}
-          </span>
-        </span>
-        <span className="shrink-0 font-semibold">Switch ›</span>
-      </button>
+          <span className="shrink-0 font-semibold">Switch ›</span>
+        </button>
+        <ThemeToggle className="shrink-0 hover:bg-background/15" />
+      </div>
       {open && data && <Sheet data={data} onClose={() => setOpen(false)} />}
     </>
   );

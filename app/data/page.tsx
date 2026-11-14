@@ -230,6 +230,15 @@ const CHART_EXAMPLES: { what: string; args: Record<string, unknown> }[] = [
     },
   },
   {
+    what: "Where money slips away — yearly cost, habits with 'skip one', drip jar",
+    args: {
+      chart_type: "leaks",
+      title: "Where my money slips away 💸",
+      data_tool: "everyday_leaks",
+      data_args: { period: "last_90_days" },
+    },
+  },
+  {
     what: "The 3 baskets with categories — tap a category to see what's inside",
     args: {
       chart_type: "baskets",

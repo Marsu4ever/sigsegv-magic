@@ -119,7 +119,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     return reply(
       `Small purchases (≤ €${l.smallPurchases.maxEur}) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
         `${eur(l.smallPurchases.perMonthEur)} a month — ${eur(l.smallPurchases.perYearEur)} a year.`,
-      chart("bar", "Everyday spending per month", "everyday_leaks", { period: "last_90_days" }),
+      chart("leaks", "Where my money slips away 💸", "everyday_leaks", { period: "last_90_days" }),
     );
   }
 

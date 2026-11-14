@@ -7,6 +7,7 @@
  * Use them in Tailwind as e.g. bg-accent, text-muted, border-line.
  */
 :root {
+  color-scheme: light;
   --background: #f6f7f5;
   --surface: #ffffff;
   --foreground: #1a1d1a;
@@ -15,10 +16,53 @@
   --accent: #00855f;
   --accent-foreground: #ffffff;
 
+  /* Errors and "rejected" (red), notices like the mock-AI badge (yellow). */
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --warning: #854d0e;
+  --warning-soft: #fef9c3;
+
   /* One color per basket — used by charts and the Week tab. */
   --basket-regular: #2f6fd6;
   --basket-irregular: #e08a00;
   --basket-everyday: #d6455d;
+
+  /* Spending calendar: little → a lot (empty days use --line, the most uses --accent). */
+  --heat-1: #c3e6d5;
+  --heat-2: #7fcca6;
+  --heat-3: #2fa877;
+}
+
+/*
+ * Dark mode. components/ThemeToggle.tsx (plus a tiny script in app/layout.tsx)
+ * sets data-theme on <html>: the phone's setting by default, or the user's pick.
+ * WHY only variables change: every component uses these colors, so nothing
+ * else needs a dark version. New colors → add them in BOTH blocks.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0f1311;
+  --surface: #1a1f1c;
+  --foreground: #e8ece9;
+  --muted: #9aa39c;
+  --line: #2c332e;
+  /* WHY brighter green + dark text on it: #00855f is too dark to read on black. */
+  --accent: #34c58e;
+  --accent-foreground: #07140e;
+
+  --danger: #f87171;
+  --danger-soft: #3a1a1d;
+  --warning: #fde68a;
+  --warning-soft: #3a3410;
+
+  --basket-regular: #5b8ef0;
+  --basket-irregular: #f0a030;
+  --basket-everyday: #ef6b80;
+
+  /* WHY reversed: on a dark page, little spending must look dim, a lot bright. */
+  --heat-1: #173d2c;
+  --heat-2: #1f6b4a;
+  --heat-3: #2a9a6a;
 }
 
 @theme inline {
@@ -29,6 +73,10 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   /* WHY system fonts: next/font/google downloads fonts at build time, which
      can fail on hackathon wifi. System fonts also look native on phones. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -70,4 +118,128 @@ body {
 }
 .chart-flash {
   animation: chart-flash-fade 1.6s ease-out forwards;
+}
+
+/* "Leaks" chart animations. Everything is switched off for people who ask
+   their system for reduced motion (see the media query at the end). */
+
+/* Each small purchase drops into the jar and bounces a little on landing. */
+@keyframes jar-drop-in {
+  0% {
+    transform: translateY(var(--fall));
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  72% {
+    transform: translateY(0);
+  }
+  84% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+.jar-drop {
+  animation: jar-drop-in 0.7s ease-in both;
+}
+
+/* Cards and lines slide up into place one after another. */
+@keyframes leak-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.leak-fade-up {
+  animation: leak-fade-up 0.45s ease-out both;
+}
+
+/* The "skipping saves you" line and a pressed chip pop in. */
+@keyframes leak-pop {
+  0% {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.leak-pop {
+  animation: leak-pop 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jar-drop,
+  .leak-fade-up,
+  .leak-pop {
+    animation: none;
+  }
+}
+
+/* "Leaks" jar: a marble that turns green pops once (scales from its centre). */
+@keyframes marble-green-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.marble-green {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marble-green-pop 0.45s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marble-green {
+    animation: none;
+  }
+}
+
+/* "Leaks" jar: gold ("sparks joy") marbles pop once, then shimmer gently. */
+@keyframes marble-gold-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.4);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes marble-shimmer {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+.marble-gold {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation:
+    marble-gold-pop 0.45s ease-out,
+    marble-shimmer 2.4s ease-in-out 0.45s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marble-gold {
+    animation: none;
+  }
 }

@@ -116,7 +116,7 @@ export function ChatView() {
       <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3">
         <h1 className="font-semibold">Money Coach</h1>
         {mode === "mock" && (
-          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">
+          <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning">
             mock AI
           </span>
         )}

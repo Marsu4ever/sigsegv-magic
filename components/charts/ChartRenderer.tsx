@@ -23,6 +23,7 @@ import {
 import type { ChartSpec } from "@/lib/types";
 import { basketColor, colorFor } from "./colors";
 import { BasketsChart } from "./Baskets";
+import { LeaksChart } from "./Leaks";
 import { HeatmapExplorer, HeatmapPreview } from "./Heatmap";
 import { CumulativeChart } from "./Cumulative";
 
@@ -56,6 +57,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   }
   if (spec.type === "cumulative") return <CumulativeChart spec={spec} compact={compact} />;
   if (spec.type === "baskets") return <BasketsChart spec={spec} compact={compact} />;
+  if (spec.type === "leaks") return <LeaksChart spec={spec} compact={compact} />;
 
   const monthly = isMonthly(spec.rows);
   // Two series side by side (e.g. "You" vs "Typical")? Only when rows have value2.
@@ -121,7 +123,20 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
   const tiltLabels =
     !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
   const height = compact ? 160 : 340;
-  const tooltip = <Tooltip formatter={(v) => formatValue(Number(v), spec.unit)} />;
+  // WHY styled: Recharts' default tooltip is a white box, which glares in dark mode.
+  const tooltip = (
+    <Tooltip
+      formatter={(v) => formatValue(Number(v), spec.unit)}
+      contentStyle={{
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: 8,
+        color: "var(--foreground)",
+      }}
+      labelStyle={{ color: "var(--muted)" }}
+      cursor={{ fill: "var(--line)", fillOpacity: 0.5 }}
+    />
+  );
 
   return (
     <div>
