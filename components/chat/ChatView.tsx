@@ -308,7 +308,12 @@ export function ChatView() {
           </div>
         )}
         {messages.map((m, i) => (
-          <MessageBubble key={i} message={m} />
+          <MessageBubble
+            key={i}
+            message={m}
+            // WHY only the latest reply: older offers are stale once the chat moved on.
+            onFollowUp={i === messages.length - 1 && !loading ? send : undefined}
+          />
         ))}
         {loading && <p className="text-sm text-muted">Thinking…{elapsed >= 3 && ` ${elapsed}s`}</p>}
         <div ref={bottomRef} />

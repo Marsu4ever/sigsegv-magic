@@ -14,6 +14,7 @@ import { allMerchantTypes, listCategories } from "@/lib/data";
 import { resolveTarget } from "@/lib/insights/targets";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { runTool } from "./tools";
+import { splitFollowUp } from "@/lib/followUp";
 
 /** Run a tool and return its data (what the AI would see). */
 function data(tool: string, args: Record<string, unknown> = {}) {
@@ -52,7 +53,7 @@ function whatIfText(w: WhatIf): string {
   const P = FORECAST_PERIOD_TEXT;
   const next = w.months === 1 ? "next month" : `in the next ${P[w.months]}`;
   if (w.emptyReason === "short_history") {
-    return "You have less than a month of spending history — not enough data yet to make a prediction.";
+    return "You have less than a month of spending history, not enough data yet to make a prediction.";
   }
   if (w.emptyReason === "no_spending") {
     // WHY no "switch to 3 months": every period uses the same 12-month average (DECISIONS.md #25).
@@ -77,7 +78,37 @@ function whatIfText(w: WhatIf): string {
   return `${none}In a typical month you spend about ${minus(a.perMonthEur)} on ${what} (average of ${basis}), ${estimate}. ${save}`;
 }
 
+/** Short "yes"-style answers, English and Finnish. */
+const YES = /^(yes|yeah|yep|yup|sure|ok|okay|please|go ahead|kyllä|joo|juu|näytä)\b/i;
+
+/** Questions the mock understands, offered one at a time as the [[button]] (lib/followUp.ts). */
+const MOCK_OFFERS = [
+  "Where does my money slip away?",
+  "What if I spend less on restaurants?",
+  "What's safe to spend this week?",
+  "How am I doing this month?",
+  "Show my spending calendar",
+];
+
+/**
+ * Like the real AI (prompt.ts, HOW TO ANSWER): a "yes" does what the last reply offered,
+ * and every reply ends with one offer the user can tap.
+ */
 export function mockReply(history: ChatMessage[]): ChatMessage {
+  let asked = history;
+  if (YES.test((history.at(-1)?.text ?? "").trim())) {
+    const prev = history.findLast((m) => m.role === "assistant");
+    const offer = prev ? splitFollowUp(prev.text).followUp : null;
+    if (offer) asked = [...history.slice(0, -1), { role: "user", text: offer }];
+  }
+  const answer = mockAnswer(asked);
+  if (splitFollowUp(answer.text).followUp) return answer;
+  const done = new Set(asked.filter((m) => m.role === "user").map((m) => m.text.toLowerCase()));
+  const next = MOCK_OFFERS.find((o) => !done.has(o.toLowerCase()));
+  return next ? { ...answer, text: `${answer.text}\n[[${next}]]` } : answer;
+}
+
+function mockAnswer(history: ChatMessage[]): ChatMessage {
   const q = (history.at(-1)?.text ?? "").toLowerCase();
   const reply = (text: string, ...charts: (ChartSpec | undefined)[]): ChatMessage => ({
     role: "assistant",
@@ -125,7 +156,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const m = data("month_progress");
     const diff = m.differenceVsLastMonthSoFarEur;
     return reply(
-      `So far this month you've spent ${minus(m.spentSoFarEur)} — ${diff >= 0 ? minus(diff) : plus(-diff)} ${diff >= 0 ? "more" : "less"} ` +
+      `So far this month you've spent ${minus(m.spentSoFarEur)}, ${diff >= 0 ? minus(diff) : plus(-diff)} ${diff >= 0 ? "more" : "less"} ` +
         `than by the same day last month. At this pace the month ends around ${minus(m.projectedMonthTotalEur)} ` +
         `(last month: ${minus(m.lastMonthTotalEur)}).`,
       chart("cumulative", "This month so far", "month_progress"),
@@ -134,7 +165,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
 
   if (has(q, "heatmap", "calendar", "heat map", "which days", "activity")) {
     return reply(
-      "Here's your spending calendar — darker days = more spending. Tap it to switch months and see what you bought on any day.",
+      "Here's your spending calendar. Darker days = more spending. Tap it to switch months and see what you bought on any day.",
       chart("heatmap", category ? `${category} calendar` : "Spending calendar", "spend_over_time", {
         period: "all",
         ...(category ? { category } : {}),
@@ -168,7 +199,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     };
     const w = data("what_if", args);
     return reply(
-      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month — ${plus(w.savingPerYearEur)} a year.`,
+      `Cutting ${w.what} by ${pct}% would save about ${plus(w.savingPerMonthEur)} a month, ${plus(w.savingPerYearEur)} a year.`,
       chart("bar", `${w.what}: now vs after −${pct}%`, "what_if", args),
     );
   }
@@ -177,7 +208,7 @@ export function mockReply(history: ChatMessage[]): ChatMessage {
     const l = data("everyday_leaks", { period: "last_90_days" });
     return reply(
       `Small purchases (≤ €${l.smallPurchases.maxEur}) happen ${l.smallPurchases.timesPerMonth}× a month and add up to ` +
-        `${minus(l.smallPurchases.perMonthEur)} a month — ${minus(l.smallPurchases.perYearEur)} a year.`,
+        `${minus(l.smallPurchases.perMonthEur)} a month, ${minus(l.smallPurchases.perYearEur)} a year.`,
       chart("leaks", "Where my money slips away 💸", "everyday_leaks", { period: "last_90_days" }),
     );
   }
