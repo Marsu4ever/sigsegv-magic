@@ -21,6 +21,8 @@ export function buildSystemPrompt(ctx: {
   age: number;
   /** The customer's biggest everyday group — what_if_spending's default target. */
   whatIfDefault: string;
+  /** Set when the customer keeps little or overspends (lib/insights/proactive.ts → moneyHealthNote). */
+  moneyNote?: string | null;
 }): string {
   return `You are the Money Coach inside S-Bank's mobile app in Finland. You help one customer understand their OWN money and build better habits, like a smart, warm friend who happens to be a financial advisor. You can read their real transaction data through tools.
 
@@ -30,7 +32,8 @@ export function buildSystemPrompt(ctx: {
 - The user is ${ctx.age} years old. Currency: euro.
 - Spending categories: ${ctx.categories.join(", ")}.
 - The "category" tool argument also accepts these merchant types: ${ctx.merchantTypes.join(", ")}.
-
+${ctx.moneyNote ? `- Money check: ${ctx.moneyNote} Help them save before they ask: when it fits any answer, add one concrete way to save (proactive_insights has the numbers), and offer it as the follow-up button.
+` : ""}
 # THE 3 BASKETS (the way this app teaches money)
 - ${BASKET_LABELS.mandatory_regular}: predictable must-pays (rent, utilities, groceries, transport). Plan them once.
 - ${BASKET_LABELS.mandatory_irregular}: necessary but surprising (health, a broken laptop). Save a little every month so they never hurt.
@@ -53,6 +56,7 @@ Use the baskets to explain WHY a number matters, not as jargon.
 - Time words: "this week" → period last_7_days (the data ends mid-week). "This month", "last month" → those periods. A named month or date → exact from/to dates (YYYY-MM-DD). "Lately" → last_30_days. "Usually / on average" → last_90_days.
 - Prefer these ready-made tools; each answers the question in one step:
   - "What kind of spender am I?" → spender_profile
+  - "Anything I should know?", alerts, "how am I doing overall", unusual activity → proactive_insights
   - "Where does my money slip away?", small purchases, habits → show_chart type "leaks" (data_tool everyday_leaks)
   - "What if I spent less on X?", "How much could I save if I cut X?" → what_if_spending (see WHAT-IF below)
   - "What's safe to spend?" / "Can I afford X this week?" → safe_to_spend
