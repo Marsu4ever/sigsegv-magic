@@ -25,19 +25,35 @@ export function ChartFullscreen({ spec, onClose }: { spec: ChartSpec; onClose: (
         className="flex h-dvh w-full max-w-md flex-col bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="font-semibold">{spec.title}</h2>
-          <button type="button" onClick={onClose} className="px-2 text-xl text-muted" aria-label="Close">
+        <header className="flex items-center gap-2 border-b border-line px-3 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-full border border-line px-2.5 py-1 text-xs text-accent"
+          >
+            ← Back
+          </button>
+          <h2 className="min-w-0 flex-1 truncate font-semibold">{spec.title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-2 text-xl text-muted"
+            aria-label="Close"
+          >
             ✕
           </button>
         </header>
         <div className="flex-1 overflow-y-auto p-4">
           <ChartRenderer spec={spec} compact={false} />
-          {spec.type !== "table" && (
-            <div className="mt-4">
-              <ChartRenderer spec={{ ...spec, type: "table" }} compact={false} />
-            </div>
-          )}
+          {/* WHY no extra table for heatmap/cumulative/baskets: they show their own details. */}
+          {spec.type !== "table" &&
+            spec.type !== "heatmap" &&
+            spec.type !== "cumulative" &&
+            spec.type !== "baskets" && (
+              <div className="mt-4">
+                <ChartRenderer spec={{ ...spec, type: "table" }} compact={false} />
+              </div>
+            )}
         </div>
       </div>
     </div>

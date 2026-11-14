@@ -63,6 +63,11 @@ export function isSpending(t: Transaction): boolean {
   return t.amountEur < 0 && !NOT_SPENDING_CATEGORIES.has(t.category.toLowerCase());
 }
 
+/** Money coming in: salary or other income (positive amounts). */
+export function isIncome(t: Transaction): boolean {
+  return categoryKind(t.category) === "income" && t.amountEur > 0;
+}
+
 /** How much was spent, as a positive number of euros. */
 export function spentEur(t: Transaction): number {
   return isSpending(t) ? -t.amountEur : 0;
@@ -95,7 +100,7 @@ export function getTransactions(range?: DateRange): Transaction[] {
   return range ? txs.filter((t) => inRange(t.date, range)) : txs;
 }
 
-function round2(n: number): number {
+export function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 

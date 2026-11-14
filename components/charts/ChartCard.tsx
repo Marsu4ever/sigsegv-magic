@@ -23,8 +23,10 @@ export function ChartCard({ spec }: { spec: ChartSpec }) {
           <span className="shrink-0 text-xs text-muted">Expand ⤢</span>
         </div>
         {/* WHY pointer-events-none: taps go to the card (open full screen),
-            not to chart tooltips, which are fiddly on a phone. */}
-        <div className="pointer-events-none">
+            not to chart tooltips, which are fiddly on a phone.
+            Exception: the heatmap has its own mouse-only hover popup; a click on
+            it still reaches the card and opens full screen. */}
+        <div className={spec.type === "heatmap" ? "" : "pointer-events-none"}>
           <ChartRenderer spec={spec} compact />
         </div>
       </button>

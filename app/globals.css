@@ -38,3 +38,36 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* WHY: a click on a chart drew a blue/black focus box (Recharts made the
+   chart focusable). Charts are now not focusable (accessibilityLayer={false});
+   this is the safety net for anything inside a chart that still takes focus. */
+.recharts-responsive-container,
+.recharts-responsive-container *,
+.recharts-wrapper,
+.recharts-wrapper * {
+  outline: none !important;
+}
+/* WHY: on phones a long press on a chart selected it (blue box) or opened the
+   "save image" menu. Charts aren't text to copy, so turn both off. */
+.recharts-wrapper,
+.recharts-wrapper * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* "Month so far": the glow that runs along a line when its box is tapped. */
+@keyframes chart-flash-fade {
+  0%,
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.chart-flash {
+  animation: chart-flash-fade 1.6s ease-out forwards;
+}

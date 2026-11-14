@@ -19,11 +19,7 @@
  */
 export type Basket = "mandatory_regular" | "mandatory_irregular" | "everyday";
 
-export const BASKETS: Basket[] = [
-  "mandatory_regular",
-  "mandatory_irregular",
-  "everyday",
-];
+export const BASKETS: Basket[] = ["mandatory_regular", "mandatory_irregular", "everyday"];
 
 /** Human-readable basket names for the UI. */
 export const BASKET_LABELS: Record<Basket, string> = {
@@ -168,15 +164,73 @@ export type DemoCustomersResponse = {
  * WHY: the AI picks the chart TYPE and TITLE, but `rows` always come from
  * our own data functions, never typed by the AI. That keeps numbers exact.
  */
-export type ChartType = "bar" | "line" | "pie" | "table";
+/**
+ * "heatmap" = GitHub-style calendar of DAILY spending (rows must be one per
+ * day, label "YYYY-MM-DD"). Tapping it opens a month-by-month explorer.
+ * "cumulative" = month so far: running total per day of month, with a
+ * projection to month end and last month as a dashed line (month_progress).
+ */
+export type ChartType = "bar" | "line" | "pie" | "table" | "heatmap" | "cumulative" | "baskets";
 
-export type ChartRow = { label: string; value: number };
+/**
+ * One row of a chart. `value2` is optional: when set, the chart compares two
+ * series side by side (e.g. "You" vs "Typical for your age").
+ */
+export type ChartRow = {
+  label: string;
+  value: number;
+  value2?: number;
+  /** "cumulative" charts: true = this value is a projection, not real yet. */
+  projected?: boolean;
+  /** "cumulative" charts: average running total by this day over the last 12 months. */
+  average?: number;
+};
 
 export type ChartSpec = {
   type: ChartType;
   title: string;
   unit: string; // e.g. "€"
   rows: ChartRow[];
+  /** Names of the two series when rows have value2, e.g. ["You", "Typical"]. */
+  seriesNames?: [string, string];
+  /** Key numbers shown above/below the chart, e.g. "Spent so far: 1 421 €". */
+  facts?: { label: string; value: number }[];
+  /** A list shown under the chart in full screen (first 5, tap for more). */
+  items?: {
+    label: string;
+    sub?: string;
+    value: number;
+    date?: string; // "YYYY-MM-DD" — lets the chart highlight a picked day
+    group?: string; // e.g. category — used for the pie view of the list
+  }[];
+  /**
+   * Month-by-month charts ("cumulative"): which month is shown and how far the
+   * ‹ › arrows can go. Months are "YYYY-MM". Other months: GET /api/month-progress.
+   */
+  monthNav?: { shown: string; first: string; last: string };
+  /** "baskets" charts: baskets → categories → merchant types, biggest first. */
+  baskets?: BasketGroup[];
+  /** Human-readable period the chart covers, e.g. "1.9.–29.9.2026". */
+  periodLabel?: string;
+};
+
+/** One basket with its categories and what's inside them (see basketTree.ts). */
+export type BasketGroup = {
+  basket: Basket;
+  label: string;
+  total: number;
+  categories: {
+    name: string;
+    total: number;
+    count: number;
+    merchants: {
+      name: string;
+      total: number;
+      count: number;
+      /** Each purchase, oldest first ("YYYY-MM-DD", euros). */
+      purchases: { date: string; amount: number }[];
+    }[];
+  }[];
 };
 
 // ─── Chat ────────────────────────────────────────────────────────────────
@@ -200,6 +254,19 @@ export type ChatResponse = {
 };
 
 // ─── Week tab ────────────────────────────────────────────────────────────
+
+/** GET /api/day?date=YYYY-MM-DD response body (heatmap day details). */
+export type DaySpending = {
+  date: string;
+  totalEur: number;
+  incomeEur: number;
+  transactions: {
+    category: string;
+    merchantType: string | null;
+    amountEur: number; // positive = spent
+    basket: Basket;
+  }[];
+};
 
 /** GET /api/week response body. */
 export type WeekSummary = {

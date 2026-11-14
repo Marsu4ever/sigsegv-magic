@@ -10,7 +10,13 @@
  * running `npm run dev`. If the chat hangs or fails, look there first.
  */
 import type { ChartSpec, ChatMessage } from "@/lib/types";
-import { allMerchantTypes, getCustomer, getDataToday, listCategories } from "@/lib/data";
+import {
+  allMerchantTypes,
+  getCustomer,
+  getDataToday,
+  getTransactions,
+  listCategories,
+} from "@/lib/data";
 import { getAiConfig } from "./config";
 import { chatCompletion, LlmError, type LlmMessage } from "./llm";
 import { buildSystemPrompt } from "./prompt";
@@ -73,6 +79,7 @@ export async function runChat(history: ChatMessage[]): Promise<{
       role: "system",
       content: buildSystemPrompt({
         today: getDataToday(),
+        firstDay: getTransactions()[0]?.date ?? getDataToday(),
         categories: listCategories(),
         merchantTypes: allMerchantTypes(),
         age: getCustomer().age,

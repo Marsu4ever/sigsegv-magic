@@ -15,7 +15,7 @@ import {
   merchantType,
 } from "@/lib/data";
 import { BASKET_DESCRIPTIONS, classifyBasket, listMccOverrides } from "@/lib/data/baskets";
-import { runTool } from "@/lib/ai/tools";
+import { listToolNames, runTool } from "@/lib/ai/tools";
 import { compareToPeers } from "@/lib/insights/benchmarks";
 import { getMortgageSummary } from "@/lib/data/mortgage";
 import { ChartCard } from "@/components/charts/ChartCard";
@@ -139,6 +139,123 @@ const CHART_EXAMPLES: { what: string; args: Record<string, unknown> }[] = [
       data_args: { period: "last_month" },
     },
   },
+  {
+    what: "Income vs spending — what you keep",
+    args: {
+      chart_type: "bar",
+      title: "Last month: income vs spending",
+      data_tool: "income_summary",
+      data_args: { period: "last_month" },
+    },
+  },
+  {
+    what: "Two periods side by side",
+    args: {
+      chart_type: "bar",
+      title: "Last month vs this month",
+      data_tool: "compare_periods",
+      data_args: { period: "last_month", period_b: "this_month" },
+    },
+  },
+  {
+    what: "You vs people your age (from benchmarks)",
+    args: {
+      chart_type: "bar",
+      title: "You vs your age group (€/month)",
+      data_tool: "compare_to_peers",
+      data_args: {},
+    },
+  },
+  {
+    what: "Account balance over time — the squeeze before payday",
+    args: {
+      chart_type: "line",
+      title: "Balance, last 90 days",
+      data_tool: "balance_over_time",
+      data_args: { period: "last_90_days" },
+    },
+  },
+  {
+    what: "Where money slips away (everyday basket, per month)",
+    args: {
+      chart_type: "bar",
+      title: "Everyday spending per month",
+      data_tool: "everyday_leaks",
+      data_args: { period: "last_90_days" },
+    },
+  },
+  {
+    what: "Bills, savings and regular habits",
+    args: {
+      chart_type: "table",
+      title: "Regular payments (per month)",
+      data_tool: "recurring_payments",
+      data_args: {},
+    },
+  },
+  {
+    what: "What if — cut restaurants by 20 %",
+    args: {
+      chart_type: "bar",
+      title: "Restaurants: now vs −20 %",
+      data_tool: "what_if",
+      data_args: { category: "restaurants", change_percent: -20 },
+    },
+  },
+  {
+    what: "Safe to spend this week",
+    args: {
+      chart_type: "table",
+      title: "Safe to spend",
+      data_tool: "safe_to_spend",
+      data_args: { days: 7 },
+    },
+  },
+  {
+    what: "Surprise costs per month (basket 2)",
+    args: {
+      chart_type: "bar",
+      title: "Surprise costs per month",
+      data_tool: "irregular_buffer",
+      data_args: {},
+    },
+  },
+  {
+    what: "Spending calendar (heatmap) — tap it, switch months, tap a day",
+    args: {
+      chart_type: "heatmap",
+      title: "Spending calendar",
+      data_tool: "spend_over_time",
+      data_args: { period: "all" },
+    },
+  },
+  {
+    what: "The 3 baskets with categories — tap a category to see what's inside",
+    args: {
+      chart_type: "baskets",
+      title: "Your 3 baskets",
+      data_tool: "basket_details",
+      data_args: { period: "this_month" },
+    },
+  },
+  {
+    what: "Month so far vs last month, with projection — tap for details",
+    args: {
+      chart_type: "cumulative",
+      title: "This month so far",
+      data_tool: "month_progress",
+      data_args: {},
+    },
+  },
+  {
+    what: "Biggest purchases",
+    args: {
+      chart_type: "table",
+      title: "Biggest purchases, last 90 days",
+      data_tool: "largest_transactions",
+      data_args: { period: "last_90_days" },
+    },
+  },
 ];
 
 export default function DataPage() {
@@ -153,6 +270,7 @@ function DataBody() {
   const categories = getDatasetCategories();
   const mccOverrides = listMccOverrides();
   const peers = compareToPeers();
+  const tools = listToolNames();
   const charts = CHART_EXAMPLES.map((c) => ({
     ...c,
     spec: runTool("show_chart", c.args).chart as ChartSpec,
@@ -351,6 +469,27 @@ function DataBody() {
             </div>
           ))}
         </div>
+      </Section>
+
+      {/* ── 4b. AI tools ─────────────────────────────────────────────── */}
+      <Section
+        title="4b. Tools the AI can call"
+        note={
+          <>
+            Defined in <Code>lib/ai/tools.ts</Code>. The AI can combine several for one question.
+            &ldquo;chart&rdquo; = can be drawn with <Code>show_chart</Code>.
+          </>
+        }
+      >
+        <ul className="space-y-1.5 text-sm">
+          {tools.map((t) => (
+            <li key={t.name}>
+              <Code>{t.name}</Code>
+              {t.chartable && <span className="ml-1 text-[10px] text-accent">chart</span>}
+              <div className="text-xs text-muted">{t.description}</div>
+            </li>
+          ))}
+        </ul>
       </Section>
 
       {/* ── 5. Peer comparison ──────────────────────────────────────── */}
