@@ -14,6 +14,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Basket, ChartRow, ChartSpec, DaySpending } from "@/lib/types";
 import { BASKET_LABELS } from "@/lib/types";
+import { Icon } from "@/components/ui/Icon";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -38,6 +39,9 @@ const BASKET_DOT: Record<Basket, string> = {
   mandatory_irregular: "var(--basket-irregular)",
   everyday: "var(--basket-everyday)",
 };
+
+// How many of the month's biggest days get the shine (a hint that days are tappable).
+const TOP_SHINE = 3;
 
 // Fits in a calendar cell: "84 €", "613 €", "1,2k €". WHY whole euros: cents don't fit.
 const shortEur = (n: number) =>
@@ -110,6 +114,12 @@ function MonthGrid({
   const weeks: string[] = [];
   for (let w = mondayOf(first); w <= last; w = addDays(w, 7)) weeks.push(w);
   const gap = Math.max(2, Math.round(cell / 9));
+  // The month's biggest spending days, biggest first → they shine (see .day-shine).
+  const topDays = [...byDate]
+    .filter(([d, v]) => d.startsWith(month) && v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_SHINE)
+    .map(([d]) => d);
 
   // WHY weekdays across the top (team decision): reads like a normal calendar —
   // Mon…Sun left to right, one row per week.
@@ -135,6 +145,7 @@ function MonthGrid({
               const v = byDate.get(date);
               const hasData = v !== undefined;
               const isSel = date === selected;
+              const rank = topDays.indexOf(date); // -1 = not a top day
               // WHY a <div> when not clickable: the preview sits inside the chat
               // card's <button>, and a button inside a button is invalid HTML.
               const Cell = onSelect ? "button" : "div";
@@ -156,8 +167,16 @@ function MonthGrid({
                   }
                   onPointerLeave={() => onHover?.(null, null)}
                   title={onHover ? undefined : hasData ? `${date}: ${eur(v!)}` : `${date}: no data`}
-                  className="relative flex items-center justify-center rounded"
+                  className={`relative flex items-center justify-center rounded ${
+                    onSelect && hasData
+                      ? "cursor-pointer transition-transform hover:scale-105 active:scale-95"
+                      : ""
+                  } ${rank >= 0 ? "day-shine" : ""}`}
                   style={{
+                    // WHY staggered: three cells flashing in sync looks like a glitch.
+                    ...(rank >= 0
+                      ? ({ "--shine-delay": `${rank * 0.35}s` } as React.CSSProperties)
+                      : {}),
                     width: cell,
                     height: cell,
                     background: hasData ? LEVEL_COLORS[level(v!)] : "transparent",
@@ -178,7 +197,7 @@ function MonthGrid({
                         <span
                           className="font-semibold tabular-nums"
                           style={{
-                            fontSize: Math.min(14, cell / 4.2),
+                            fontSize: Math.min(16, cell / 3.8),
                             color: level(v!) >= 3 ? "var(--accent-foreground)" : "var(--foreground)",
                           }}
                         >
@@ -258,9 +277,10 @@ function DayList({ day }: { day: DaySpending }) {
         <button
           type="button"
           onClick={() => setShown(left > 0 ? shown + LIST_STEP : LIST_STEP)}
-          className="mt-2 w-full rounded-lg border border-line py-1.5 text-sm text-accent"
+          className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg border border-line py-1.5 text-sm text-accent"
         >
-          {left > 0 ? `Show more (${left} left)` : "Show less"}
+          <Icon name="chevron" size={14} className={left > 0 ? "rotate-90" : "-rotate-90"} />
+          {left > 0 ? `${left} more` : "Less"}
         </button>
       )}
     </>
@@ -525,24 +545,30 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
           type="button"
           onClick={() => setMonth(shiftMonth(month, -1))}
           disabled={month <= firstMonth}
-          className="rounded-full border border-line px-3 py-1 text-lg disabled:opacity-30"
+          className="rounded-full border border-line p-2 disabled:opacity-30"
           aria-label="Previous month"
         >
-          ‹
+          <Icon name="chevron" size={18} className="rotate-180" />
         </button>
         <div className="text-center">
           <div className="font-semibold">{monthName(month)}</div>
           <MonthTotal value={monthTotal} big />
-          <div className="mt-0.5 text-xs text-muted">spending on {spendDays} days</div>
+          <div
+            className="mt-1 flex items-center justify-center gap-1 text-xs text-muted"
+            title="Days with spending"
+          >
+            <Icon name="calendar" size={12} />
+            {spendDays} days
+          </div>
         </div>
         <button
           type="button"
           onClick={() => setMonth(shiftMonth(month, 1))}
           disabled={month >= lastMonth}
-          className="rounded-full border border-line px-3 py-1 text-lg disabled:opacity-30"
+          className="rounded-full border border-line p-2 disabled:opacity-30"
           aria-label="Next month"
         >
-          ›
+          <Icon name="chevron" size={18} />
         </button>
       </div>
 
@@ -579,8 +605,13 @@ export function HeatmapExplorer({ spec }: { spec: ChartSpec }) {
       {selected ? (
         <DayPanel panelRef={details} selected={selected} day={day} />
       ) : (
-        <p className="text-center text-sm text-muted">
-          Hover a day for a quick look, tap it to see everything.
+        <p className="flex items-center justify-center gap-1.5 text-center text-sm text-muted">
+          <Icon name="tap" size={14} className="shrink-0" />
+          Tap a day for its purchases
+          <span className="text-accent">
+            <Icon name="sparkles" size={12} />
+          </span>
+          = biggest
         </p>
       )}
     </div>
@@ -612,11 +643,15 @@ function DayPanel({
             <span className="font-semibold">{dayTitle(selected)}</span>
             <span className="font-semibold tabular-nums">{eur(day.totalEur)}</span>
           </div>
-          <p className="mb-2 text-xs text-muted">
-            {day.transactions.length} purchase{day.transactions.length === 1 ? "" : "s"}, biggest
-            first
+          <p className="mb-2 flex items-center gap-3 text-xs text-muted">
+            <span className="flex items-center gap-1" title="Purchases, biggest first">
+              <Icon name="bag" size={12} />
+              {day.transactions.length} purchase{day.transactions.length === 1 ? "" : "s"}
+            </span>
             {day.incomeEur > 0 && (
-              <span className="text-accent"> · + {eur(day.incomeEur)} income this day</span>
+              <span className="flex items-center gap-1 text-accent" title="Income this day">
+                <Icon name="trend" size={12} />+ {eur(day.incomeEur)}
+              </span>
             )}
           </p>
           {day.transactions.length === 0 ? (
