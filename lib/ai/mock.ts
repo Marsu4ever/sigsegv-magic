@@ -267,7 +267,7 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     return reply(
       `You're a "${p.type}" (${p.typeRule}). You keep ${Math.round(p.keptShare * 100)}% of your income. ` +
         `Small purchases under ${p.smallPurchasesLast90Days.maxEur} € add up to ${minus(p.smallPurchasesLast90Days.perMonthEur)} a month.`,
-      chart("pie", "Your spending by basket (%)", "spender_profile"),
+      chart("pie", "Your spending by type (%)", "spender_profile"),
     );
   }
 
@@ -368,9 +368,9 @@ function mockAnswer(history: ChatMessage[]): ChatMessage {
     );
   }
 
-  if (q.includes("basket")) {
+  if (q.includes("basket") || q.includes("spending type")) {
     // WHY 90 days: one month often has only 2–3 categories; 3 months shows the real mix.
-    const c = chart("baskets", "Your 3 baskets (last 90 days)", "basket_details", {
+    const c = chart("baskets", "Your spending types (last 90 days)", "basket_details", {
       period: "last_90_days",
     });
     const rows = c?.rows ?? [];
