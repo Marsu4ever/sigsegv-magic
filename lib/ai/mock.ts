@@ -14,6 +14,7 @@ import { allMerchantTypes, listCategories } from "@/lib/data";
 import { resolveTarget } from "@/lib/insights/targets";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { runTool } from "./tools";
+import { splitFollowUp } from "@/lib/followUp";
 
 /** Run a tool and return its data (what the AI would see). */
 function data(tool: string, args: Record<string, unknown> = {}) {
@@ -77,7 +78,37 @@ function whatIfText(w: WhatIf): string {
   return `${none}In a typical month you spend about ${minus(a.perMonthEur)} on ${what} (average of ${basis}), ${estimate}. ${save}`;
 }
 
+/** Short "yes"-style answers, English and Finnish. */
+const YES = /^(yes|yeah|yep|yup|sure|ok|okay|please|go ahead|kyllä|joo|juu|näytä)\b/i;
+
+/** Questions the mock understands, offered one at a time as the [[button]] (lib/followUp.ts). */
+const MOCK_OFFERS = [
+  "Where does my money slip away?",
+  "What if I spend less on restaurants?",
+  "What's safe to spend this week?",
+  "How am I doing this month?",
+  "Show my spending calendar",
+];
+
+/**
+ * Like the real AI (prompt.ts, HOW TO ANSWER): a "yes" does what the last reply offered,
+ * and every reply ends with one offer the user can tap.
+ */
 export function mockReply(history: ChatMessage[]): ChatMessage {
+  let asked = history;
+  if (YES.test((history.at(-1)?.text ?? "").trim())) {
+    const prev = history.findLast((m) => m.role === "assistant");
+    const offer = prev ? splitFollowUp(prev.text).followUp : null;
+    if (offer) asked = [...history.slice(0, -1), { role: "user", text: offer }];
+  }
+  const answer = mockAnswer(asked);
+  if (splitFollowUp(answer.text).followUp) return answer;
+  const done = new Set(asked.filter((m) => m.role === "user").map((m) => m.text.toLowerCase()));
+  const next = MOCK_OFFERS.find((o) => !done.has(o.toLowerCase()));
+  return next ? { ...answer, text: `${answer.text}\n[[${next}]]` } : answer;
+}
+
+function mockAnswer(history: ChatMessage[]): ChatMessage {
   const q = (history.at(-1)?.text ?? "").toLowerCase();
   const reply = (text: string, ...charts: (ChartSpec | undefined)[]): ChatMessage => ({
     role: "assistant",
