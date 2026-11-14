@@ -22,7 +22,7 @@
  * entry to TOOLS below. If it returns `rows`, set chartable: true and it can
  * be drawn with show_chart automatically.
  */
-import type { Basket, ChartRow, ChartSpec, ChartType, DateRange } from "@/lib/types";
+import type { Basket, ChartRow, ChartSpec, ChartType, DateRange, MoneyTone } from "@/lib/types";
 import type { ToolDefinition } from "./llm";
 import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import {
@@ -555,6 +555,41 @@ export type ToolResult = {
 /** Max rows sent to the LLM. WHY: e.g. 2 years of daily balances = 730 rows of tokens. */
 const MAX_ROWS_FOR_LLM = 60;
 
+/** Tools whose rows are all money going out (spending), shown red in the chat. */
+const SPENDING_TOOLS = new Set([
+  "spend_by_category",
+  "basket_breakdown",
+  "spend_over_time",
+  "largest_transactions",
+  "compare_periods",
+  "compare_to_peers",
+  "everyday_leaks",
+  "recurring_payments",
+  "irregular_buffer",
+]);
+
+/**
+ * Green ("in") or red ("out") for one chart row — see MoneyTone in lib/types.ts.
+ * WHY decided here and not by the AI: the meaning comes from which data tool made
+ * the number, so the color is always right. Unset = neutral (balance, loan, %).
+ */
+function rowTone(tool: string, row: ChartRow, rows: ChartRow[]): MoneyTone | undefined {
+  if (SPENDING_TOOLS.has(tool)) return "out";
+  switch (tool) {
+    case "income_summary": // Income · Spending · Kept
+      return row.label === "Spending" || row.value < 0 ? "out" : "in";
+    case "safe_to_spend": // costs before payday are negative; the rest is money you have
+      return row.value < 0 ? "out" : "in";
+    case "what_if": {
+      // "Now" is today's spending; "After −20 %" is the better choice if it's lower.
+      const now = rows[0]?.value ?? 0;
+      return row === rows[0] || row.value > now ? "out" : "in";
+    }
+    default:
+      return undefined;
+  }
+}
+
 function forLlm(full: ToolOutput): string {
   // WHY drop chartList: it's for the screen; the LLM already gets the same data.
   // basketTree is the same data as `baskets`, kept for the screen only.
@@ -618,7 +653,13 @@ export function runTool(name: string, args: Args): ToolResult {
             : type === "leaks"
               ? BY_NAME.get("everyday_leaks")!.run(dataArgs as Args)
               : dataTool.run(dataArgs as Args);
-    const rows = out.rows ?? [];
+    // WHY only here (not in the tool output): tone is for the screen; the LLM doesn't need it.
+    const rawRows = out.rows ?? [];
+    const toneTool = type === "heatmap" ? "spend_over_time" : dataTool.name;
+    const rows = rawRows.map((r) => {
+      const tone = r.tone ?? rowTone(toneTool, r, rawRows);
+      return tone ? { ...r, tone } : r;
+    });
     const chart: ChartSpec = {
       type,
       // WHY fixed for "leaks": the team picked this title (shown in italics).

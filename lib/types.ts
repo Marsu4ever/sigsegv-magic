@@ -177,10 +177,19 @@ export type ChartType =
  * One row of a chart. `value2` is optional: when set, the chart compares two
  * series side by side (e.g. "You" vs "Typical for your age").
  */
+/**
+ * How an amount reads (added 14 Nov): "in" = money coming in, kept or saved — a good
+ * outcome (green); "out" = money going out, i.e. spending (red). Unset = neutral.
+ * Set by show_chart in lib/ai/tools.ts (rowTone), never by the AI.
+ */
+export type MoneyTone = "in" | "out";
+
 export type ChartRow = {
   label: string;
   value: number;
   value2?: number;
+  /** Green or red in the chat (see MoneyTone). Optional — older charts are unchanged. */
+  tone?: MoneyTone;
   /** "cumulative" charts: true = this value is a projection, not real yet. */
   projected?: boolean;
   /** "cumulative" charts: average running total by this day over the last 12 months. */

@@ -22,6 +22,11 @@
   --warning: #854d0e;
   --warning-soft: #fef9c3;
 
+  /* Money in the chat: coming in / kept / saved = green, spending = red.
+     They point at --accent and --danger, so dark mode follows automatically. */
+  --money-in: var(--accent);
+  --money-out: var(--danger);
+
   /* One color per basket — used by charts and the Week tab. */
   --basket-regular: #2f6fd6;
   --basket-irregular: #e08a00;
@@ -77,6 +82,8 @@
   --color-danger-soft: var(--danger-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-money-in: var(--money-in);
+  --color-money-out: var(--money-out);
   /* WHY system fonts: next/font/google downloads fonts at build time, which
      can fail on hackathon wifi. System fonts also look native on phones. */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

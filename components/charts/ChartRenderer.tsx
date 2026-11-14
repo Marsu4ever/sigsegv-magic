@@ -20,12 +20,25 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { ChartSpec } from "@/lib/types";
+import type { ChartRow, ChartSpec } from "@/lib/types";
 import { basketColor, colorFor } from "./colors";
 import { BasketsChart } from "./Baskets";
 import { LeaksChart } from "./Leaks";
 import { HeatmapExplorer, HeatmapPreview } from "./Heatmap";
 import { CumulativeChart } from "./Cumulative";
+
+/**
+ * Green for money coming in / kept / saved, red for spending (ChartRow.tone,
+ * set in lib/ai/tools.ts). Undefined = neutral, use the chart's normal color.
+ */
+export function toneColor(tone: ChartRow["tone"]): string | undefined {
+  return tone === "in" ? "var(--money-in)" : tone === "out" ? "var(--money-out)" : undefined;
+}
+
+/** Tailwind text class for a value with a tone (tables, lists). */
+export function toneClass(tone: ChartRow["tone"]): string {
+  return tone === "in" ? "text-money-in" : tone === "out" ? "text-money-out" : "";
+}
 
 export function formatValue(value: number, unit: string): string {
   return unit === "€"
@@ -81,7 +94,9 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
           {rows.map((r, i) => (
             <tr key={i} className="border-b border-line last:border-0">
               <td className="py-1.5 pr-2">{shortLabel(r.label, monthly)}</td>
-              <td className="py-1.5 text-right tabular-nums">{formatValue(r.value, spec.unit)}</td>
+              <td className={`py-1.5 text-right tabular-nums ${toneClass(r.tone)}`}>
+                {formatValue(r.value, spec.unit)}
+              </td>
               {twoSeries && (
                 <td className="py-1.5 pl-2 text-right tabular-nums text-muted">
                   {formatValue(r.value2 ?? 0, spec.unit)}
@@ -116,10 +131,14 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
             fill:
               spec.type === "pie"
                 ? colorFor(r.label, i)
-                : (basketColor(r.label) ?? "var(--accent)"),
+                : (basketColor(r.label) ?? toneColor(r.tone) ?? "var(--accent)"),
           }),
     }));
   const SECOND_COLOR = "#a9b1a9";
+  // Lines and the first of two series: red if every row is spending, green if every
+  // row is money in (see toneColor), otherwise the usual accent.
+  const tones = new Set(spec.rows.map((r) => r.tone));
+  const mainColor = (tones.size === 1 && toneColor([...tones][0])) || "var(--accent)";
   const tiltLabels =
     !compact && data.length > 5 && data.length <= 12 && data.some((d) => d.label.length > 6);
   const height = compact ? 160 : 340;
@@ -167,7 +186,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
               <Line
                 dataKey="value"
                 name={name1}
-                stroke="var(--accent)"
+                stroke={mainColor}
                 strokeWidth={2}
                 dot={!compact && data.length <= 31}
               />
@@ -200,7 +219,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
               {tooltip}
               {twoSeries ? (
                 <>
-                  <Bar dataKey="value" name={name1} fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value" name={name1} fill={mainColor} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="value2" name={name2} fill={SECOND_COLOR} radius={[4, 4, 0, 0]} />
                 </>
               ) : (
@@ -213,7 +232,7 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
       {twoSeries && spec.type !== "pie" && (
         <ul className="mt-2 flex justify-center gap-4 text-xs">
           <li className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ background: "var(--accent)" }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: mainColor }} />
             {name1}
           </li>
           <li className="flex items-center gap-1.5">
