@@ -15,6 +15,7 @@ import { chatCompletion } from "@/lib/ai/llm";
 import { TOOL_DEFINITIONS } from "@/lib/ai/tools";
 import { getCustomerId, getDataToday, getTransactions } from "@/lib/data";
 import { withPickedCustomer } from "@/lib/data/request";
+import { versionLabel } from "@/lib/version";
 
 type Check = { name: string; ok: boolean; info: string };
 
@@ -41,6 +42,9 @@ export async function GET(request: Request) {
       info: err instanceof Error ? err.message : String(err),
     });
   }
+
+  // Which build is running (see lib/version.ts).
+  checks.push({ name: "version", ok: true, info: versionLabel() });
 
   // 2. AI config
   const config = getAiConfig();
