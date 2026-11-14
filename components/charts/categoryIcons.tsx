@@ -197,8 +197,8 @@ export function CategoryTile({ category, active }: { category: string; active?: 
     <span
       className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors"
       style={{
-        // White card with a soft shadow (team call); solid colour when opened.
-        background: active ? color : "white",
+        // Card-coloured chip with a soft shadow (team call); solid colour when opened.
+        background: active ? color : "var(--surface)",
         boxShadow: active
           ? `0 1px 3px color-mix(in srgb, ${color} 45%, transparent)`
           : "0 1px 2px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.05)",

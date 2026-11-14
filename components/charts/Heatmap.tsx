@@ -31,7 +31,8 @@ const MONTHS = [
   "December",
 ];
 // Level 0 = no spending, 1–4 = more and more (like GitHub's greens).
-const LEVEL_COLORS = ["var(--line)", "#c3e6d5", "#7fcca6", "#2fa877", "var(--accent)"];
+// WHY CSS variables: the scale has its own dark-mode version (app/globals.css).
+const LEVEL_COLORS = ["var(--line)", "var(--heat-1)", "var(--heat-2)", "var(--heat-3)", "var(--accent)"];
 const BASKET_DOT: Record<Basket, string> = {
   mandatory_regular: "var(--basket-regular)",
   mandatory_irregular: "var(--basket-irregular)",
@@ -164,7 +165,7 @@ function MonthGrid({
                     outline: isSel ? "2px solid var(--foreground)" : "none",
                     outlineOffset: 1,
                     fontSize: cell >= 28 ? 11 : 0,
-                    color: hasData && level(v!) >= 3 ? "white" : "var(--muted)",
+                    color: hasData && level(v!) >= 3 ? "var(--accent-foreground)" : "var(--muted)",
                   }}
                 >
                   {showAmounts ? (
@@ -178,7 +179,7 @@ function MonthGrid({
                           className="font-semibold tabular-nums"
                           style={{
                             fontSize: Math.min(14, cell / 4.2),
-                            color: level(v!) >= 3 ? "white" : "var(--foreground)",
+                            color: level(v!) >= 3 ? "var(--accent-foreground)" : "var(--foreground)",
                           }}
                         >
                           {shortEur(v!)}
@@ -411,7 +412,7 @@ function HoverPopup({
         <span className="text-sm font-semibold tabular-nums">{eur(total)}</span>
       </div>
       {!day && <p className="px-2 text-xs text-muted">Loading…</p>}
-      {day && "error" in day && <p className="px-2 text-xs text-red-600">⚠️ {day.error}</p>}
+      {day && "error" in day && <p className="px-2 text-xs text-danger">⚠️ {day.error}</p>}
       {day && !("error" in day) && (
         <>
           {day.transactions.length === 0 ? (
@@ -603,7 +604,7 @@ function DayPanel({
       ref={panelRef}
       className="scroll-mt-4 rounded-xl border border-line bg-surface p-3 shadow-sm"
     >
-      {day && "error" in day && <p className="text-sm text-red-600">⚠️ {day.error}</p>}
+      {day && "error" in day && <p className="text-sm text-danger">⚠️ {day.error}</p>}
       {!day && <p className="text-sm text-muted">Loading…</p>}
       {day && !("error" in day) && (
         <div>
