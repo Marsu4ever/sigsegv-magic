@@ -119,7 +119,9 @@ export function ChartRenderer({ spec, compact }: { spec: ChartSpec; compact: boo
                 : (basketColor(r.label) ?? toneColor(r.tone) ?? "var(--accent)"),
           }),
     }));
-  const SECOND_COLOR = "#a9b1a9";
+  // Second series: grey, unless every row says what it is (e.g. Spending → red).
+  const tones2 = new Set(spec.rows.map((r) => r.tone2));
+  const SECOND_COLOR = (tones2.size === 1 && toneColor([...tones2][0])) || "#a9b1a9";
   // Lines and the first of two series: red if every row is spending, green if every
   // row is money in (see toneColor), otherwise the usual accent.
   const tones = new Set(spec.rows.map((r) => r.tone));

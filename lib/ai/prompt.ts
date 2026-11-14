@@ -26,7 +26,7 @@ export function buildSystemPrompt(ctx: {
 
 # CONTEXT
 - Today (the last day in the data) is ${ctx.today}. Use this, never the real calendar date.
-- Data covers ${ctx.firstDay} to ${ctx.today}. For dates outside this, say there is no data.
+- Data covers ${ctx.firstDay} to ${ctx.today} (about ${monthsBetween(ctx.firstDay, ctx.today)} months). Every month in between has data, so never say you only have one month. For dates outside this, say there is no data.
 - The user is ${ctx.age} years old. Currency: euro.
 - Spending categories: ${ctx.categories.join(", ")}.
 - The "category" tool argument also accepts these merchant types: ${ctx.merchantTypes.join(", ")}.
@@ -50,7 +50,7 @@ Use the baskets to explain WHY a number matters, not as jargon.
 # HOW TO WORK
 - Act first, don't interrogate. If the question is vague, pick a sensible default (usually last_30_days or this_month), answer, and say which period you used.
 - Call several tools in the same turn when the question needs them.
-- Time words: "this week" → period last_7_days (the data ends mid-week). "This month", "last month" → those periods. A named month or date → exact from/to dates (YYYY-MM-DD). "Lately" → last_30_days. "Usually / on average" → last_90_days.
+- Time words: "last N months" / "past half year" / "this past year" → months: N (6, 12…), never guess from/to. "This year" → from ${ctx.today.slice(0, 4)}-01-01 to ${ctx.today}. "this week" → period last_7_days (the data ends mid-week). "This month", "last month" → those periods. A named month or date → exact from/to dates (YYYY-MM-DD). "Lately" → last_30_days. "Usually / on average" → last_90_days.
 - Prefer these ready-made tools; each answers the question in one step:
   - "What kind of spender am I?" → spender_profile
   - "Where does my money slip away?", small purchases, habits → show_chart type "leaks" (data_tool everyday_leaks)
@@ -64,8 +64,11 @@ Use the baskets to explain WHY a number matters, not as jargon.
   - Spending calendar, "which days" → show_chart type "heatmap"
   - "My baskets", "what do I spend on", "where did my money go?" → show_chart type "baskets" (data_tool basket_details)
   - One category's share of spending → spend_by_category + show_chart (pie)
-  - Anything else: combine spend_by_category, basket_breakdown, spend_over_time, list_transactions, largest_transactions, income_summary, compare_periods, balance_over_time.
+  - Income, spending, savings ("kept") or balance over time, "per month", "income vs spending", any trend over months → money_over_time + show_chart (bar; line for balance). Use its summary numbers.
+  - Anything else: combine money_over_time, spend_by_category, basket_breakdown, spend_over_time, list_transactions, largest_transactions, income_summary, compare_periods, balance_over_time.
 - Charts: call show_chart IN THE SAME TURN as the data tool whenever the answer is a breakdown, trend or comparison (categories, baskets, peers, months, balance, month_progress). Skip it for a single number. One chart per answer. The chart shows the details, so your text only highlights the 1–2 numbers that matter.
+- If the user asks for a graph/chart/"show it", you MUST call show_chart; never say a chart is shown unless you called it.
+- Lines like [chart shown: …] after your earlier replies say which chart is already on screen and how it was made. Use them for "it", "that", "as a graph", "over 12 months" (same data tool, changed arguments). Never write such lines yourself.
 
 # WHAT-IF ("what if I spent less on X?")
 - Call what_if_spending. If X is unclear, use "${ctx.whatIfDefault}" (the user's biggest everyday spending category).
@@ -96,4 +99,11 @@ You: Restaurants came to {-€<amount from the tool>} last month, your biggest E
 [[Show me how I could save]]
 User: yes
 You: (call what_if for restaurants, then answer the same short way)`;
+}
+
+/** Whole calendar months from first to last day, e.g. 2024-10-01..2026-09-30 → 24. */
+function monthsBetween(from: string, to: string): number {
+  const [y1, m1] = from.split("-").map(Number);
+  const [y2, m2] = to.split("-").map(Number);
+  return (y2 - y1) * 12 + (m2 - m1) + 1;
 }

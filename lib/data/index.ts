@@ -115,7 +115,7 @@ function sortDesc(rows: ChartRow[]): ChartRow[] {
  * Checks the category AND the merchant type from the MCC code.
  * Returns the label to group it under, or null if it doesn't match.
  */
-function matchLabel(t: Transaction, needle?: string): string | null {
+export function matchLabel(t: Transaction, needle?: string): string | null {
   if (!needle) return t.category;
   if (t.category.toLowerCase().includes(needle)) return t.category;
   const mt = merchantType(t.mccCode);

@@ -190,6 +190,8 @@ export type ChartRow = {
   value2?: number;
   /** Green or red in the chat (see MoneyTone). Optional — older charts are unchanged. */
   tone?: MoneyTone;
+  /** Same for value2 (the second series), e.g. "Spending" next to "Income". */
+  tone2?: MoneyTone;
   /** "cumulative" charts: true = this value is a projection, not real yet. */
   projected?: boolean;
   /** "cumulative" charts: average running total by this day over the last 12 months. */
@@ -199,6 +201,11 @@ export type ChartRow = {
 export type ChartSpec = {
   type: ChartType;
   title: string;
+  /**
+   * Which data tool + arguments made this chart (set by show_chart). Sent back with the
+   * history so a follow-up like "show it over 12 months" knows what "it" was.
+   */
+  source?: { tool: string; args: Record<string, unknown> };
   unit: string; // e.g. "€"
   rows: ChartRow[];
   /** Names of the two series when rows have value2, e.g. ["You", "Typical"]. */
