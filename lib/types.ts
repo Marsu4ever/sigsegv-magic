@@ -313,7 +313,11 @@ export type WeekSummary = {
   totalSpentEur: number;
   byBasket: Record<Basket, number>;
   byDay: ChartRow[]; // one row per day, label = "Mon", "Tue", ...
+  /** Same days, split by basket (for the stacked "By day" chart). */
+  byDayBasket: ({ label: string } & Record<Basket, number>)[];
   topCategories: ChartRow[];
+  /** Basket of each top category (same order) — for colour-coding on the Week tab. */
+  topCategoryBaskets: Basket[];
 };
 
 // ─── What-if / forecast ──────────────────────────────────────────────────

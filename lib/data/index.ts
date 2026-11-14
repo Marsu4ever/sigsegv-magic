@@ -207,15 +207,46 @@ export function listTransactions(
 export function getWeekSummary(): WeekSummary {
   const range = periodToRange("last_7_days");
   const byBasket = basketBreakdown(range);
-  const byDay = spendOverTime(range, "day").map((r) => ({
+  const days = spendOverTime(range, "day");
+  const topCategories = spendByCategory(range).slice(0, 5);
+  const byDay = days.map((r) => ({
     label: weekdayLabel(r.label),
     value: r.value,
   }));
+  // Each day split into the 3 baskets (stacked bars on the Week tab).
+  const perDay = new Map(
+    days.map((r) => [r.label, Object.fromEntries(BASKETS.map((b) => [b, 0])) as Record<Basket, number>]),
+  );
+  // Also: which basket each category's euros mostly went to (for colour-coding;
+  // a category can be split, e.g. taxis count as everyday, buses as regular).
+  const catBasket = new Map<string, Record<Basket, number>>();
+  for (const t of getTransactions(range)) {
+    if (!isSpending(t)) continue;
+    const d = perDay.get(t.date.slice(0, 10));
+    if (d) d[t.basket] += spentEur(t);
+    const c =
+      catBasket.get(t.category) ??
+      (Object.fromEntries(BASKETS.map((b) => [b, 0])) as Record<Basket, number>);
+    c[t.basket] += spentEur(t);
+    catBasket.set(t.category, c);
+  }
+  const byDayBasket = days.map((r) => {
+    const d = perDay.get(r.label)!;
+    return {
+      label: weekdayLabel(r.label),
+      ...(Object.fromEntries(BASKETS.map((b) => [b, round2(d[b])])) as Record<Basket, number>),
+    };
+  });
   return {
     range,
     totalSpentEur: round2(BASKETS.reduce((sum, b) => sum + byBasket[b], 0)),
     byBasket,
     byDay,
-    topCategories: spendByCategory(range).slice(0, 5),
+    byDayBasket,
+    topCategories,
+    topCategoryBaskets: topCategories.map((r) => {
+      const c = catBasket.get(r.label);
+      return c ? BASKETS.reduce((a, b) => (c[b] > c[a] ? b : a)) : "everyday";
+    }),
   };
 }

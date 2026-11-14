@@ -261,3 +261,31 @@ body {
     animation: none;
   }
 }
+
+/* Week tab: the 🔥 next to the #1 category flickers like a Duolingo streak flame. */
+@keyframes flame-flicker {
+  0%,
+  100% {
+    transform: scale(1) rotate(-3deg);
+  }
+  25% {
+    transform: scale(1.12) rotate(3deg);
+  }
+  50% {
+    transform: scale(0.96) rotate(-2deg);
+  }
+  75% {
+    transform: scale(1.08) rotate(2deg);
+  }
+}
+.flame-flicker {
+  display: inline-block;
+  transform-origin: 50% 90%;
+  animation: flame-flicker 1.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.55));
+}
+@media (prefers-reduced-motion: reduce) {
+  .flame-flicker {
+    animation: none;
+  }
+}
