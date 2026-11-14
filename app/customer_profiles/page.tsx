@@ -3,7 +3,7 @@
  * a rough spending type, so we can pick good ones for testing and the demo.
  * Logic lives in lib/data/profiles.ts.
  */
-import { BASKETS, type Basket } from "@/lib/types";
+import { BASKETS, BASKET_LABELS, type Basket } from "@/lib/types";
 import { getCustomerId } from "@/lib/data";
 import { allProfiles, SPENDING_TYPES, type CustomerProfile } from "@/lib/data/profiles";
 import { ageGroupFor } from "@/lib/insights/benchmarks";
@@ -15,12 +15,6 @@ const BASKET_COLOR: Record<Basket, string> = {
   mandatory_regular: "var(--basket-regular)",
   mandatory_irregular: "var(--basket-irregular)",
   everyday: "var(--basket-everyday)",
-};
-
-const BASKET_SHORT: Record<Basket, string> = {
-  mandatory_regular: "Regular",
-  mandatory_irregular: "Irregular",
-  everyday: "Everyday",
 };
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -67,7 +61,7 @@ function ProfileCard({ p, current }: { p: CustomerProfile; current: boolean }) {
       <div className="mt-1 flex justify-between text-[11px] text-muted">
         {BASKETS.map((b) => (
           <span key={b}>
-            {BASKET_SHORT[b]} {pct(p.basketShare[b])}
+            {BASKET_LABELS[b]} {pct(p.basketShare[b])}
           </span>
         ))}
       </div>

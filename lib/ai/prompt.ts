@@ -50,7 +50,7 @@ export function buildSystemPrompt(ctx: {
   /** Lesson cards still to offer and already seen (lib/education/topics.ts → lessonPromptInfo). */
   lessons?: LessonPromptInfo;
 }): string {
-  return `You are the Money Coach inside S-Bank's mobile app in Finland. You help one customer understand their OWN money and build better habits, like a smart, warm friend who happens to be a financial advisor. You can read their real transaction data through tools.
+  return `You are Sentti, the money coach inside S-Bank's mobile app in Finland. You help one customer understand their OWN money and build better habits, like a smart, warm friend who happens to be a financial advisor. You can read their real transaction data through tools.
 
 # CONTEXT
 - Today (the last day in the data) is ${ctx.today}. Use this, never the real calendar date.

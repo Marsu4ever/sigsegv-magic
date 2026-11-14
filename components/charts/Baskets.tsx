@@ -1,6 +1,6 @@
 "use client";
 /**
- * "Baskets" chart — the 3 baskets, each in its own colour, with the
+ * "Baskets" chart (users see "spending types") — the 3 types, each in its own colour, with the
  * categories inside as lighter shades of that colour. Owner: UI person.
  * Data: basket_details (lib/insights/basketTree.ts).
  *
@@ -11,7 +11,7 @@
  *   both:        a bracket under the bar shows each basket's share in %
  */
 import { useState } from "react";
-import type { Basket, BasketGroup, ChartSpec } from "@/lib/types";
+import { BASKET_LABELS, type Basket, type BasketGroup, type ChartSpec } from "@/lib/types";
 import { CategoryTile } from "./categoryIcons";
 
 const eur = (n: number) => n.toLocaleString("fi-FI", { style: "currency", currency: "EUR" });
@@ -20,21 +20,20 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const shortDate = (d: string) =>
   `${WEEKDAYS[new Date(d + "T00:00:00Z").getUTCDay()]} ${Number(d.slice(8))}.${Number(d.slice(5, 7))}.`;
 
-// WHY the team's own words here: "regular / irregular / everything else" is how
-// we explain the baskets to people.
+// WHY names from BASKET_LABELS: the same names everywhere in the app and in the coach's replies.
 const BASKET_TEXT: Record<Basket, { name: string; meaning: string; color: string }> = {
   mandatory_regular: {
-    name: "Regular",
+    name: BASKET_LABELS.mandatory_regular,
     meaning: "Same bills every month",
     color: "var(--basket-regular)",
   },
   mandatory_irregular: {
-    name: "Surprising expenses",
+    name: BASKET_LABELS.mandatory_irregular,
     meaning: "Needed, but surprise timing",
     color: "var(--basket-irregular)",
   },
   everyday: {
-    name: "Everything else",
+    name: BASKET_LABELS.everyday,
     meaning: "Your choices — easiest to change",
     color: "var(--basket-everyday)",
   },

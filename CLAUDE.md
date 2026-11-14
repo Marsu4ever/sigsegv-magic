@@ -2,7 +2,7 @@
 
 # Project notes for Claude (and humans)
 
-Hackathon project: AI money coach for S-Bank (Junction 2026). Team of 4. Read README.md and DECISIONS.md first.
+Hackathon project: Sentti, an AI money coach for S-Bank (Junction 2026). Team of 4. Read README.md and DECISIONS.md first.
 
 ## Rules
 - Every number shown to the user comes from `lib/data`. The AI never calculates; it calls tools (`lib/ai/tools.ts`).

@@ -1,5 +1,5 @@
 """
-Money Coach LLM server on Modal: Qwen3.6-35B-A3B (FP8) behind vLLM's
+Sentti LLM server on Modal (app name money-coach-llm, kept from before the rename): Qwen3.6-35B-A3B (FP8) behind vLLM's
 OpenAI-compatible "chat completions" API, with tool calling. Owner: AI person.
 
     modal deploy ai-server/qwen_vllm.py     # deploy / update (prints the URL)

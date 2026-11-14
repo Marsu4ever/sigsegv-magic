@@ -15,7 +15,7 @@ import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import { RouteFade } from "@/components/RouteFade";
 
 export const metadata: Metadata = {
-  title: "Money Coach",
+  title: "Sentti",
   description: "Chat with your own money — Junction 2026 × S-Bank",
 };
 

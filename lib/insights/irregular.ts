@@ -1,6 +1,6 @@
 /**
  * irregular_buffer — "How much should I set aside for surprise costs?"
- * Owner: INSIGHTS person. Teaches basket 2 (mandatory & irregular).
+ * Owner: INSIGHTS person. Teaches spending type 2 (Surprising expenses).
  *
  * Looks at the whole history, month by month, of the irregular basket
  * (health, home & tech). Suggests:

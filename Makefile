@@ -1,4 +1,4 @@
-# Shortcuts for the Money Coach app. Needs Node.js 20.9+ (with nvm: `nvm use`).
+# Shortcuts for the Sentti app. Needs Node.js 20.9+ (with nvm: `nvm use`).
 #
 #   make         list these commands
 #   make dev     run the app → http://localhost:3000 (installs packages only when needed)

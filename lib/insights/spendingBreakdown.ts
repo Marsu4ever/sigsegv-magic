@@ -1,6 +1,6 @@
 /**
- * The Spending breakdown on Home: one month of spending split into the 3 baskets
- * (Regular essentials / Unexpected necessities / Everyday), each with its categories,
+ * The Spending breakdown on Home: one month of spending split into the 3 spending types
+ * (Regular / Surprising expenses / Everyday spending, see BASKET_LABELS), each with its categories,
  * merchant types and purchases. Owner: INSIGHTS person. SERVER ONLY.
  *
  * WHY no new categorisation: the baskets come from lib/data/baskets.ts (each transaction's

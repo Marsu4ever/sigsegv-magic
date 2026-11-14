@@ -24,12 +24,12 @@ export const SPENDING_TYPES: { type: SpendingType; label: string; rule: string }
   {
     type: "everyday_heavy",
     label: "Everyday-heavy",
-    rule: "37% or more of spending is in the everyday basket",
+    rule: "37% or more of spending is Everyday spending",
   },
   {
     type: "fixed_costs_heavy",
     label: "Fixed-costs heavy",
-    rule: "58% or more of spending is mandatory & regular",
+    rule: "58% or more of spending is Regular",
   },
   { type: "balanced", label: "Balanced", rule: "none of the above" },
 ];

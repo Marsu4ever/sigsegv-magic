@@ -1,7 +1,7 @@
 "use client";
 /**
- * Spending breakdown on Home: one month of money out in the 3 baskets the challenge asks for
- * (Regular essentials, Unexpected necessities, Everyday spending). Owner: UI person.
+ * Spending breakdown on Home: one month of money out in the 3 spending types the challenge asks for
+ * (names from BASKET_LABELS: Regular, Surprising expenses, Everyday spending). Owner: UI person.
  * Data: GET /api/spending?month= (lib/insights/spendingBreakdown.ts). Every transaction's basket
  * comes from the backend (lib/data/baskets.ts); nothing is sorted into baskets here.
  *
@@ -12,19 +12,13 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { Basket, SpendingBasket, SpendingBreakdown as Data } from "@/lib/types";
+import { BASKET_LABELS, type Basket, type SpendingBasket, type SpendingBreakdown as Data } from "@/lib/types";
 import { fiDate, formatValue, monthName, weekdayDate } from "@/components/charts/format";
 import { TYPE_COLOR } from "@/components/week/WeekView";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Icon } from "@/components/ui/Icon";
 import { Skeleton, SkeletonGroup, SkeletonRows } from "@/components/ui/Skeleton";
 
-/** WHY these names here (not BASKET_LABELS): the challenge's wording, plain for customers. */
-const NAME: Record<Basket, string> = {
-  mandatory_regular: "Regular essentials",
-  mandatory_irregular: "Unexpected necessities",
-  everyday: "Everyday spending",
-};
 
 const eur = (n: number) => formatValue(n, "€");
 const pct = (share: number) => `${Math.round(share * 100)} %`;
@@ -65,7 +59,7 @@ function PurchasesSheet({
 }) {
   const newestFirst = [...merchant.purchases].reverse();
   return (
-    <BottomSheet label={`${category} · ${NAME[basket]}`} title={merchant.name} onClose={onClose}>
+    <BottomSheet label={`${category} · ${BASKET_LABELS[basket]}`} title={merchant.name} onClose={onClose}>
       <ul className="mt-3 overflow-hidden rounded-xl bg-surface shadow-sm">
         {newestFirst.map((p, i) => (
           <li key={`${p.date}-${i}`} className="flex justify-between gap-3 border-b border-line px-4 py-2.5 text-sm last:border-0">
@@ -118,7 +112,7 @@ function BasketRow({
         <div className="flex items-baseline justify-between gap-3">
           <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: TYPE_COLOR[b.basket] }} />
-            <span className="truncate">{NAME[b.basket]}</span>
+            <span className="truncate">{BASKET_LABELS[b.basket]}</span>
           </span>
           <span className="flex shrink-0 items-center gap-1 text-sm font-semibold tabular-nums">
             {eur(b.total)}

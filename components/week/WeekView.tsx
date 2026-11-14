@@ -28,7 +28,7 @@ import { useEffect, useState } from "react";
 const FADED = 0.18;
 const fade = (focus: Basket | null, b: Basket) => (focus && focus !== b ? FADED : 1);
 import type { Basket, WeekSummary } from "@/lib/types";
-import { BASKETS } from "@/lib/types";
+import { BASKETS, BASKET_LABELS } from "@/lib/types";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { fiDate, formatValue } from "@/components/charts/format";
 import { DevHeaderButton } from "@/components/DevButton";
@@ -47,13 +47,8 @@ export const TYPE_COLOR: Record<Basket, string> = {
 const CARD_TINT = "color-mix(in srgb, var(--accent) 6%, var(--surface))";
 const TRACK = "color-mix(in srgb, var(--accent) 14%, var(--surface))";
 
-// WHY short names here (team call): "Mandatory &" made the labels long and
-// heavy; Regular / Irregular / Everyday says the same on a phone.
-const TYPE_LABEL: Record<Basket, string> = {
-  mandatory_regular: "Regular",
-  mandatory_irregular: "Surprising expenses",
-  everyday: "Everyday",
-};
+// WHY BASKET_LABELS: the same spending type names as Home, the charts and the coach.
+const TYPE_LABEL = BASKET_LABELS;
 
 const eur0 = (n: number) =>
   n.toLocaleString("fi-FI", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });

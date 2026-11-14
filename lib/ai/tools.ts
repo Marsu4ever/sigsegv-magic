@@ -205,7 +205,7 @@ const TOOLS: Tool[] = [
   {
     name: "basket_breakdown",
     description:
-      "Euros spent in each of the 3 baskets (mandatory & regular, mandatory & irregular, everyday) in a period.",
+      "Euros spent in each of the 3 spending types (Regular, Surprising expenses, Everyday spending) in a period.",
     properties: { ...periodProps },
     required: ["period"],
     chartable: true,
@@ -595,7 +595,7 @@ const TOOLS: Tool[] = [
   {
     name: "irregular_buffer",
     description:
-      "Surprise costs (mandatory & irregular basket: health, home & tech) month by month over the whole history, with average, worst month, and a suggested monthly set-aside and emergency buffer.",
+      "Surprise costs (the Surprising expenses type: health, home & tech) month by month over the whole history, with average, worst month, and a suggested monthly set-aside and emergency buffer.",
     properties: {},
     chartable: true,
     run: () => irregularBuffer(),

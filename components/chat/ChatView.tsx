@@ -319,7 +319,7 @@ export function ChatView() {
           {/* Back to where the question came from (e.g. an insight on Home). */}
           {fromLink && <BackButton fallback="/home" />}
           <LogoMark size={26} />
-          Money Coach
+          Sentti
         </h1>
         <div className="flex items-center gap-2">
           {mode === "mock" && (

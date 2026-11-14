@@ -1,7 +1,17 @@
-# sigsegv-magic — Money Coach (Junction 2026 × S-Bank)
+# Sentti (Junction 2026 × S-Bank, team sigsegv-magic)
 
-Chat with your own money. A mobile-first web app where an AI coach answers questions about your spending,
-using the **3 baskets**: mandatory & regular, mandatory & irregular, and everyday spending.
+Chat with your own money. Sentti is a mobile-first web app where an AI coach answers questions about your
+spending, using the **3 spending types**:
+
+| Spending type           | What it means                                     | Examples                             |
+| ----------------------- | ------------------------------------------------- | ------------------------------------ |
+| **Regular**             | Must-pays that come every month, about the same   | Rent, electricity, groceries, bus    |
+| **Surprising expenses** | Needed, but the timing or amount is a surprise    | Dentist, broken washing machine      |
+| **Everyday spending**   | Small choices that slip away and add up           | Coffees, takeaway, taxis, cinema     |
+
+In the code the spending types are still called `Basket` (`mandatory_regular`, `mandatory_irregular`,
+`everyday`). The names people see come from `BASKET_LABELS` in `lib/types.ts`; which category goes to which
+type is decided in `lib/data/baskets.ts`.
 
 📒 **Why things are built this way → [DECISIONS.md](DECISIONS.md)**
 
@@ -43,8 +53,8 @@ Click the small **🛠** in the far bottom-right corner of the browser window (o
 | Page                                    | What's there                                                                                                                      |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | http://localhost:3000/dev               | **Team hub — start here.** Current customer + AI mode, links to every page and every data file (with View links), who works where |
-| http://localhost:3000/data              | 8 example transactions, the 3 baskets, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data      |
-| http://localhost:3000/customer_profiles | All demo customers grouped by spending type (home-loan customers listed first), with a **Use in app** button                      |
+| http://localhost:3000/data              | 8 example transactions, the 3 spending types, the 15 categories, every chart type (tap to enlarge), peer comparison, home loan data |
+| http://localhost:3000/customer_profiles | All demo customers grouped by kind of spender (home-loan customers listed first), with a **Use in app** button                      |
 | http://localhost:3000/api/health        | Is the data loading? Which AI settings are active?                                                                                |
 
 Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/DevButton.tsx`.
@@ -56,7 +66,7 @@ Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/D
 ```
 Phone (browser)                         Server (Next.js API routes)
 ───────────────                         ───────────────────────────
-Chat tab  ── POST /api/chat ──────────► lib/ai/chat.ts ──► LLM (Modal, via .env.local)
+Coach tab ── POST /api/chat ──────────► lib/ai/chat.ts ──► LLM (Modal, via .env.local)
                                               │  LLM asks for a tool
                                               ▼
                                          lib/ai/tools.ts ──► lib/data (real numbers)
@@ -65,11 +75,13 @@ Chat tab  ── POST /api/chat ──────────► lib/ai/chat.ts
 Home      ── GET /api/account ────────► lib/data/home.ts → getAccountSummary()   (no AI, start page)
 Activity  ── GET /api/transactions ───► lib/data/home.ts → searchTransactions()   (search, filters; Home's recent list)
           ── GET /api/home ───────────► lib/insights → safeToSpend() + upcomingPayments()   (no AI)
-Insights  ── GET /api/insights ───────► lib/insights/proactive.ts → proactiveInsights()   (no AI; also an AI tool)
+Spending  ── GET /api/spending ───────► lib/insights/spendingBreakdown.ts   (month in the 3 spending types, no AI; Home)
+Insights  ── GET /api/insights ───────► lib/insights/proactive.ts → proactiveInsights()   (no AI; also an AI tool; Home)
 Week      ── GET /api/week ───────────► lib/data → getWeekSummary()   (no AI; Home + /week)
 Home loan ── GET /api/mortgage ───────► lib/data/mortgage.ts → getMortgageSummary()   (no AI)
 What-if   ── GET /api/what-if ────────► lib/insights/whatIfForecast.ts   (toggle + category buttons, no AI)
 Goal      ── GET/POST /api/goal ──────► lib/goals/ → goalView() / applyGoalAction()   (saving goal + weekly mission, no AI; state in a cookie)
+Lessons   ── GET /api/lessons ────────► lib/education/topics.ts → availableLessons()   (which lesson cards fit this customer, no AI; Home; progress kept on the device)
 ```
 
 1. User asks _"How much did I spend on taxis last month?"_
@@ -90,9 +102,9 @@ Each person works mostly in their own folder → fewer merge conflicts.
 
 | Area         | Folder                  | First tasks                                                                                                                     |
 | ------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Data**     | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → basket table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
+| **Data**     | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → spending type table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
 | **AI**       | `lib/ai/`               | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`)                              |
-| **UI**       | `app/`, `components/`   | Chat look & feel, chart cards, Week tab. Theme colors in `app/globals.css`                                                      |
+| **UI**       | `app/`, `components/`   | Coach chat look & feel, chart cards, Home and Week pages. Theme colors in `app/globals.css`                                      |
 | **Insights** | `lib/insights/`         | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md`                                    |
 
 **`lib/types.ts` is the shared contract.** Changing it affects everyone → tell the team first.
@@ -121,7 +133,7 @@ The raw dataset is ~350 MB and is **not** in our git repo.
    npm run prepare-data -- --customers CUST00001  # or pick specific ones
    ```
    This writes `data/demo/<customer>.json` (small — **commit these** so teammates don't need the raw CSV)
-   and `data/demo/_categories.json` (every category name, to fix the basket table).
+   and `data/demo/_categories.json` (every category name, to fix the spending type table).
 5. Pick a customer with **Switch** in the dark bar at the top of the app. (Optional default for everyone:
    `DEMO_CUSTOMER_ID=CUST000xx` in `.env.local`.)
 
@@ -149,13 +161,14 @@ modal deploy ai-server/qwen_vllm.py   # deploy / update
 modal app stop money-coach-llm        # stop the GPU bill
 modal app logs money-coach-llm        # server logs
 ```
+(`money-coach-llm` is the deployed Modal app's name from before the Sentti rename; leave it as is.)
 Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the AI person.
 
 ---
 
 ## Git workflow (4 people, one repo)
 
-- Never push straight to `main`. Make a branch: `git checkout -b data/basket-mapping`
+- Never push straight to `main`. Make a branch: `git checkout -b data/type-mapping`
 - Commit small, merge often (every hour or two). Big branches = painful conflicts at 3am.
 - Before pushing: `git pull origin main`, then `npm run typecheck`.
 - Open a PR on GitHub, someone glances at it, merge.
