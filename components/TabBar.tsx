@@ -10,7 +10,10 @@ import { requestChatReset } from "@/lib/chatReset";
 
 // WHY outline icons, not emoji: emoji looked homemade; these match the app.
 const TABS: { href: string; label: string; icon: IconName }[] = [
+  // WHY Chat first (far left): the AI coach is the app's main feature (team call).
   { href: "/chat", label: "Chat", icon: "chat" },
+  // WHY "Account" + coins, not "Home": the house icon already means Home loan.
+  { href: "/account", label: "Account", icon: "coins" },
   { href: "/week", label: "This week", icon: "calendar" },
   // WHY always shown: customers without a mortgage get a friendly empty state.
   { href: "/loan", label: "Home loan", icon: "home" },
