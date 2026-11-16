@@ -3,7 +3,8 @@
  * the AI provider several different ways so we can see exactly which way works.
  *
  * Run: npm run diagnose
- * Reads LLM_BASE_URL / LLM_API_KEY / LLM_MODEL from .env.local. Never prints the key.
+ * Reads OPENROUTER_API_KEY / OPENROUTER_MODEL from .env.local. Never prints the key.
+ * Free models only (same rule as lib/ai/config.ts): anything else is refused before sending.
  *
  * WHY: `curl` reached Gemini fine but the app (Node) timed out. This isolates
  * whether it's DNS, IPv4 vs IPv6, or Node's fetch (which the app uses).
@@ -24,11 +25,16 @@ try {
   console.error("Could not read .env.local — run this from the project folder.");
   process.exit(1);
 }
-const base = env.LLM_BASE_URL?.replace(/\/?$/, "/");
-const key = env.LLM_API_KEY;
-const model = env.LLM_MODEL;
-if (!base || !model) {
-  console.error("LLM_BASE_URL and LLM_MODEL must be set in .env.local");
+const base = "https://openrouter.ai/api/v1/";
+const key = env.OPENROUTER_API_KEY;
+// WHY not imported from lib/ai/config.ts: this plain Node script can't load TypeScript.
+const model = env.OPENROUTER_MODEL || "nvidia/nemotron-3.5-super-vl:free";
+if (!key) {
+  console.error("OPENROUTER_API_KEY must be set in .env.local");
+  process.exit(1);
+}
+if (!model.endsWith(":free") && model !== "openrouter/free") {
+  console.error(`Refusing "${model}": only free models (":free" or openrouter/free). See lib/ai/config.ts.`);
   process.exit(1);
 }
 const url = new URL("chat/completions", base);

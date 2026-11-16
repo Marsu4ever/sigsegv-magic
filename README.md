@@ -66,7 +66,7 @@ Hide the 🛠 button before the demo: `SHOW_DEV_BUTTON = false` in `components/D
 ```
 Phone (browser)                         Server (Next.js API routes)
 ───────────────                         ───────────────────────────
-Coach tab ── POST /api/chat ──────────► lib/ai/chat.ts ──► LLM (Modal, via .env.local)
+Coach tab ── POST /api/chat ──────────► lib/ai/chat.ts ──► OpenRouter, free model (lib/ai/openrouter.ts)
                                               │  LLM asks for a tool
                                               ▼
                                          lib/ai/tools.ts ──► lib/data (real numbers)
@@ -103,7 +103,7 @@ Each person works mostly in their own folder → fewer merge conflicts.
 | Area         | Folder                  | First tasks                                                                                                                            |
 | ------------ | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Data**     | `lib/data/`, `scripts/` | Download dataset, run `prepare-data`, fix category → spending type table in `lib/data/baskets.ts`, verify spending sign (`isSpending`) |
-| **AI**       | `lib/ai/`               | Get a Modal model running, check it supports **tool calling**, tune the coach prompt (`prompt.ts`)                                     |
+| **AI**       | `lib/ai/`               | Free OpenRouter model (`config.ts` allowlist), check **tool calling**, tune the coach prompt (`prompt.ts`)                                 |
 | **UI**       | `app/`, `components/`   | Coach chat look & feel, chart cards, Home and Week pages. Theme colors in `app/globals.css`                                            |
 | **Insights** | `lib/insights/`         | Benchmarks (Statistics Finland), "what kind of spender am I?" — see `lib/insights/README.md`                                           |
 
@@ -142,29 +142,22 @@ in `lib/data/index.ts`.
 
 ## AI setup
 
+The coach runs on **OpenRouter, free models only** (zero cost is a hard rule). Details, account
+safety settings and deploy steps: [`OPENROUTER.md`](OPENROUTER.md).
+
 In `.env.local`:
 
 ```
-LLM_BASE_URL=https://....modal.run/v1   # any "chat completions" endpoint (Modal, Gemini, Claude…)
-LLM_API_KEY=...
-LLM_MODEL=...
+OPENROUTER_API_KEY=sk-or-v1-...   # from https://openrouter.ai/settings/keys (never buy credits)
+OPENROUTER_MODEL=                 # optional; must be on FREE_MODELS in lib/ai/config.ts
 ```
 
 Restart `npm run dev`. The "mock AI" badge disappears when the real model is used.
-Set `AI_MODE=mock` to switch back without deleting your settings.
+No key, or `AI_MODE=mock` → the mock AI. A model not on the free allowlist → the chat refuses.
+Check the connection: `npm run diagnose` or `/api/health?ping=1` (one request).
 
-⚠️ The model must support **tool calling** (function calling). Test this first.
-
-**Our Modal server** (`ai-server/qwen_vllm.py`, Qwen3.6-35B-A3B on 1× H100, always on):
-
-```bash
-modal deploy ai-server/qwen_vllm.py   # deploy / update
-modal app stop money-coach-llm        # stop the GPU bill
-modal app logs money-coach-llm        # server logs
-```
-
-(`money-coach-llm` is the deployed Modal app's name from before the Sentti rename; leave it as is.)
-Use `LLM_MODEL=qwen`; the base URL is in `.env.example`, the key comes from the AI person.
+(`ai-server/qwen_vllm.py` is the old Modal Qwen server; no longer used by the app. If it is still
+deployed, `modal app stop money-coach-llm` stops its GPU bill.)
 
 ---
 
@@ -229,6 +222,6 @@ The npm scripts underneath:
 
 The demo site is on Vercel, deployed by hand with the Vercel CLI (`npx vercel --prod`).
 
-The Vercel project needs the `.env.local` values (`LLM_BASE_URL` ending in `/v1`, `LLM_API_KEY`,
-`LLM_MODEL`, optional `DEMO_CUSTOMER_ID`) as environment variables. Which build is live:
+The Vercel project needs `OPENROUTER_API_KEY` (optional `OPENROUTER_MODEL`, `DEMO_CUSTOMER_ID`)
+as environment variables; see [`OPENROUTER.md`](OPENROUTER.md). Which build is live:
 `/api/health`, `/dev`, or the bottom of the DEMO customer list.

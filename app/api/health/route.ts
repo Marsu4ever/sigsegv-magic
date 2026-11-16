@@ -10,8 +10,8 @@
  */
 import { connection } from "next/server";
 import { getAiConfig } from "@/lib/ai/config";
-import { explainLlmError, LLM_TIMEOUT_MS } from "@/lib/ai/chat";
-import { chatCompletion } from "@/lib/ai/llm";
+import { explainLlmError } from "@/lib/ai/chat";
+import { askModel } from "@/lib/ai/openrouter";
 import { TOOL_DEFINITIONS } from "@/lib/ai/tools";
 import { getCustomerId, getDataToday, getTransactions } from "@/lib/data";
 import { withPickedCustomer } from "@/lib/data/request";
@@ -50,27 +50,24 @@ export async function GET(request: Request) {
   const config = getAiConfig();
   checks.push({
     name: "ai-config",
-    ok: true,
+    ok: config.mode !== "blocked",
     info:
       config.mode === "mock"
-        ? "MOCK mode. For a real model set LLM_BASE_URL and LLM_MODEL in .env.local, then restart."
-        : `live: model=${config.model}, host=${new URL(config.baseURL).host}, key ${
-            process.env.LLM_API_KEY ? "set" : "NOT set"
-          }${config.reasoningEffort ? `, reasoning_effort=${config.reasoningEffort}` : ""}`,
+        ? "MOCK mode. For the real model set OPENROUTER_API_KEY in .env.local (or Vercel), then restart."
+        : config.mode === "blocked"
+          ? `BLOCKED: ${config.reason}`
+          : `live: OpenRouter, free model=${config.model}, key set` +
+            (config.reasoningEffort ? `, reasoning_effort=${config.reasoningEffort}` : ""),
   });
 
   // 3. Optional: one real request to the AI, like the chat sends it.
   if (new URL(request.url).searchParams.get("ping") && config.mode === "live") {
     const start = Date.now();
     try {
-      const msg = await chatCompletion({
-        baseURL: config.baseURL,
-        apiKey: config.apiKey,
-        model: config.model,
+      const msg = await askModel({
+        config,
         messages: [{ role: "user", content: "Reply with just: ok" }],
         tools: TOOL_DEFINITIONS,
-        reasoningEffort: config.reasoningEffort,
-        timeoutMs: LLM_TIMEOUT_MS,
       });
       checks.push({
         name: "ai-ping",

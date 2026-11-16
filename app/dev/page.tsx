@@ -69,7 +69,7 @@ function DevHubBody() {
             Demo customer: <Code>{current}</Code>
           </li>
           <li>
-            AI: <Code>{ai.mode === "mock" ? "mock (no real AI)" : ai.model}</Code>
+            AI: <Code>{ai.mode === "live" ? ai.model : ai.mode === "mock" ? "mock (no real AI)" : "blocked (model not on the free list)"}</Code>
           </li>
           <li>
             Version: <Code>{versionLabel()}</Code>
