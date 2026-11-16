@@ -18,7 +18,8 @@ import {
   listCategories,
 } from "@/lib/data";
 import { getAiConfig } from "./config";
-import { chatCompletion, LlmError, type LlmMessage } from "./llm";
+import { LlmError, type LlmMessage } from "./llm";
+import { askModel, LLM_TIMEOUT_MS } from "./openrouter";
 import { getDefaultTarget } from "@/lib/insights/whatIfForecast";
 import { buildSystemPrompt } from "./prompt";
 import { TOOL_DEFINITIONS, autoChartArgs, isChartable, runTool, usesMonthsRange } from "./tools";
@@ -78,8 +79,8 @@ function withMonths(args: Record<string, unknown>, months: number | null): Recor
 }
 
 
-/** Max time for ONE request to the LLM. */
-export const LLM_TIMEOUT_MS = 30_000;
+// WHY re-exported: /api/health imports it from here.
+export { LLM_TIMEOUT_MS };
 
 /**
  * Turns any LLM error into one clear sentence: what failed + the likely fix.
@@ -94,13 +95,22 @@ export function explainLlmError(err: unknown, model: string): string {
     case "timeout":
       return `LLM gave no answer within ${LLM_TIMEOUT_MS / 1000}s ${from}. Try again or try another model.`;
     case "network":
-      return `Could not reach the LLM: ${err.message}. Check LLM_BASE_URL and your internet.`;
+      return `Could not reach OpenRouter: ${err.message}. Check your internet.`;
     case "auth":
-      return `LLM rejected the API key ${from}: ${err.message}. Check LLM_API_KEY in .env.local.`;
+      return `OpenRouter rejected the API key ${from}: ${err.message}. Check OPENROUTER_API_KEY.`;
     case "not_found":
-      return `LLM says the model or URL doesn't exist ${from}: ${err.message}. Check LLM_MODEL / LLM_BASE_URL.`;
+      return `OpenRouter says the model doesn't exist or has no free provider now ${from}: ${err.message}. Try another model from FREE_MODELS (lib/ai/config.ts).`;
     case "rate_limit":
-      return `LLM quota / rate limit reached ${from}: ${err.message}. Free tiers have small limits — wait, or switch model or provider.`;
+      // WHY separate: "upstream" 429s mean the free model's shared pool is busy for everyone
+      // (we hit this with Gemma, 16 Nov); our own daily quota is untouched.
+      if (err.limitSource?.startsWith("upstream")) {
+        return `The free AI model is busy right now. Please try again in a minute. ${from}: ${err.message}`;
+      }
+      // WHY worded for users: on the demo site this is the most likely error (free tier: 20
+      // requests a minute, 50 a day). It's shown in the chat. Never solved by paying.
+      return `The free AI quota is used up for now. Please try again in a minute; if it keeps happening, the daily free limit is reached and the coach is back tomorrow. ${from}: ${err.message}`;
+    case "payment":
+      return `OpenRouter asked for credits ${from}: ${err.message}. This app only uses free models and never pays, so the request was dropped. Check OPENROUTER_MODEL.`;
     case "overloaded":
       return `LLM is overloaded right now ${from}: ${err.message}. Try again in a moment or try another model.`;
     default:
@@ -390,6 +400,23 @@ function withoutRepeatedOffer(text: string, history: ChatMessage[]): string {
   return withoutFollowUp(text);
 }
 
+/**
+ * "**85 €**" → "85 €". WHY: the chat bubble shows plain text (no markdown), so the stars showed
+ * as-is. Qwen never used them; the free Nemotron model bolds amounts (16 Nov). Amounts are
+ * already bold via the {±…} color markers (MoneyText).
+ */
+function withoutBold(text: string): string {
+  return text.replace(/\*\*(.+?)\*\*/g, "$1").replace(/__(.+?)__/g, "$1");
+}
+
+/**
+ * "{‑85 €}" → "{-85 €}". WHY: Nemotron writes the money-color marker with a non-breaking hyphen
+ * (U+2011) or hyphen (U+2010), which MoneyText doesn't read as a sign, so the amount lost its red.
+ */
+function plainMarkerSigns(text: string): string {
+  return text.replace(/\{(\s*)[\u2010\u2011]/g, "{$1-");
+}
+
 /** The model sometimes copies onScreen()'s note into its own reply; it's not for the user. */
 function withoutOnScreenNotes(text: string): string {
   return text.replace(/\s*\[On screen:[^\]\n]*\]/g, "").trim();
@@ -414,11 +441,17 @@ export async function runChat(
   const card = requested && buildLesson(requested, lessonLang(history), {}, history);
   if (card) {
     console.log(`[ai] lesson requested: ${card.topic} (card only, no LLM)`);
-    return { reply: { role: "assistant", text: "", charts: [], lessons: [card] }, mode: config.mode };
+    return { reply: { role: "assistant", text: "", charts: [], lessons: [card] }, mode: config.mode === "live" ? "live" : "mock" };
+  }
+
+  if (config.mode === "blocked") {
+    // WHY throw (→ ⚠️ in the chat): a paid or unknown model is a setup mistake to fix, not to hide.
+    console.error(`[ai] mode=blocked — ${config.reason}`);
+    throw new Error(config.reason);
   }
 
   if (config.mode === "mock") {
-    console.log("[ai] mode=mock (set LLM_BASE_URL + LLM_MODEL in .env.local for a real model)");
+    console.log("[ai] mode=mock (set OPENROUTER_API_KEY in .env.local for the real model)");
     const reply = mockWithLessons(history, seenLessons);
     return { reply: { ...reply, text: euroAfter(noLongDashes(reply.text)) }, mode: "mock" };
   }
@@ -494,16 +527,7 @@ export async function runChat(
     const start = Date.now();
     let msg;
     const ask = (toolChoice?: "required") =>
-      chatCompletion({
-        baseURL: config.baseURL,
-        apiKey: config.apiKey,
-        model: config.model,
-        messages,
-        tools: TOOL_DEFINITIONS,
-        reasoningEffort: config.reasoningEffort,
-        toolChoice,
-        timeoutMs: LLM_TIMEOUT_MS,
-      });
+      askModel({ config, messages, tools: TOOL_DEFINITIONS, toolChoice });
     try {
       try {
         msg = await ask(forceTool ? "required" : undefined);
@@ -693,7 +717,7 @@ export async function runChat(
         role: "assistant",
         // WHY: team style, no long dashes and "85 €" not "€85"; the prompt asks, these make
         // sure (lib/noDashes.ts, lib/euroAfter.ts).
-        text: euroAfter(noLongDashes(withoutRepeatedOffer(text, history))) + noChartNote,
+        text: euroAfter(noLongDashes(plainMarkerSigns(withoutBold(withoutRepeatedOffer(text, history))))) + noChartNote,
         charts: shown,
         whatIf,
         goalDraft,
@@ -712,7 +736,11 @@ export async function runChat(
     for (const call of toolCalls) {
       let args: Record<string, unknown> = {};
       try {
-        args = JSON.parse(call.function.arguments || "{}");
+        const parsed: unknown = JSON.parse(call.function.arguments || "{}");
+        // WHY: valid JSON can still be a string/array/null; tools expect an object.
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          args = parsed as Record<string, unknown>;
+        }
       } catch {
         console.warn(
           `[ai]   ${call.function.name}: bad JSON arguments, using defaults:`,
